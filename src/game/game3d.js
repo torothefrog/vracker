@@ -347,7 +347,7 @@ import * as THREE from 'three';
   canvas.addEventListener('pointerdown', (e) => {
     const ship = e.clientX < window.innerWidth / 2 ? 0 : 1;
     touches.set(e.pointerId, { ship, x0: e.clientX, steer: 0 });
-    canvas.setPointerCapture(e.pointerId);
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
   });
   canvas.addEventListener('pointermove', (e) => {
     const t = touches.get(e.pointerId);
