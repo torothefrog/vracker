@@ -332,7 +332,7 @@ import * as THREE from 'three';
   // ---------- Game state + inputs ----------
   const game = G.createGame({});
   // Read-only diagnostic handle (used by live checks; handy for tinkering).
-  window.__vracker = { game, version: '2.0.0' };
+  window.__vracker = { game, version: '2.1.0', wheels };
   let best = Number(localStorage.getItem('vracker-best') || 0);
   hudBest.textContent = 'best ' + best;
 

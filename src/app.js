@@ -28,6 +28,23 @@
   let calibrate = null;       // 'center' | 'pointer' | null
   let fpsEma = 0, lastTs = 0;
 
+  // Calibration persists in localStorage so the game page (game.html) picks
+  // up the same per-wheel colors - printer colors and lighting differ.
+  const CAL_KEY = 'vracker-calibration';
+  function saveCalibration() {
+    try { localStorage.setItem(CAL_KEY, JSON.stringify(cfg.wheels)); } catch (e) {}
+  }
+  (function loadCalibration() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CAL_KEY) || 'null');
+      if (!Array.isArray(saved)) return;
+      for (const sw of saved) {
+        const def = cfg.wheels.find(d => d.label === sw.label);
+        if (def && sw.center && sw.pointer) { def.center = sw.center; def.pointer = sw.pointer; }
+      }
+    } catch (e) {}
+  })();
+
   function hsvCss(def) {
     return 'hsl(' + def.hue + ', 90%, 55%)';
   }
@@ -97,7 +114,8 @@
       setStatus('Wheel ' + calibrate.label + ' center sampled (hue ' + h.toFixed(0) +
         '). Now click its POINTER dot.');
     } else {
-      setStatus('Wheel ' + calibrate.label + ' calibrated (center + pointer). Tracking updated.');
+      saveCalibration();
+      setStatus('Wheel ' + calibrate.label + ' calibrated (center + pointer). Tracking updated. Saved for the game too.');
       calibrate = null;
       btnCalA.classList.remove('armed');
       btnCalB.classList.remove('armed');

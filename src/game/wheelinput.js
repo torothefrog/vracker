@@ -17,7 +17,18 @@
     const pctx = preview.getContext('2d');
     const onStatus = opts.onStatus || function () {};
     const cfg = T.defaultConfig();
+    // Pick up per-wheel colors calibrated on the tracker page (same device).
+    try {
+      const saved = JSON.parse(localStorage.getItem('vracker-calibration') || 'null');
+      if (Array.isArray(saved)) {
+        for (const sw of saved) {
+          const def = cfg.wheels.find(d => d.label === sw.label);
+          if (def && sw.center && sw.pointer) { def.center = sw.center; def.pointer = sw.pointer; }
+        }
+      }
+    } catch (e) {}
     const state = T.createState();
+    const present = { A: false, B: false };
     let off = document.createElement('canvas');
     let offCtx = off.getContext('2d', { willReadFrequently: true });
     let stream = null;
@@ -69,6 +80,14 @@
       const out = T.step(state, frame, cfg, nowMs);
       latest.A = null; latest.B = null;
       for (const wh of out.wheels) latest[wh.label] = wh;
+      // Re-anchor after a drop: when a wheel comes back after being lost long
+      // enough to be dropped, its angle history restarted - treat its current
+      // position as neutral instead of jumping the ship.
+      for (const label of ['A', 'B']) {
+        const now = !!latest[label];
+        if (now && !present[label]) baselines[label] = latest[label].angleDeg;
+        present[label] = now;
+      }
 
       // Preview: mirrored-ish raw feed + per-wheel overlay, like the tracker page.
       if (preview.width !== w || preview.height !== h) { preview.width = w; preview.height = h; }
@@ -100,7 +119,7 @@
 
     function wheelSeen(label) { return !!latest[label]; }
 
-    return { start, stop, recenter, active, update, getSteer, wheelSeen };
+    return { start, stop, recenter, active, update, getSteer, wheelSeen, cfg, baselines };
   }
 
   root.VrWheelInput = { create };

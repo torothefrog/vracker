@@ -120,6 +120,14 @@ the game is playable without the camera.
 Like the tracker, everything runs locally on the device; no frames or scores
 leave the browser (the best score stays in localStorage).
 
+**Calibration carries over.** Colors calibrated on the tracker page are saved
+in the browser and picked up by the game, so printing/lighting fixes only need
+doing once. In the game, **recenter wheels** makes the current wheel position
+"straight ahead"; it also happens automatically on START. If a wheel is lost
+long enough to be dropped (hand over the markers, wheel out of frame), the
+ship just holds course while it is gone, and when the wheel comes back its
+position re-anchors as neutral - no steering jump.
+
 ## Roadmap
 
 1. ~~This milestone~~: two-wheel marker tracking, position + angle readouts. **Done.**
