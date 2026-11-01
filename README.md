@@ -61,6 +61,25 @@ unwrapped continuously and angular velocity is smoothed. `src/sim.js` is the
 synthetic feed. `src/app.js` wires camera/simulation into the page. Everything
 runs locally in the browser; no frames leave the device.
 
+### Tracking semantics and limits (read before trusting readouts)
+
+- **Position** is the midpoint of the two dots, not the exact wheel center:
+  with the pointer dot at radius r, the reported position orbits the true
+  center by r/2. Angle is the primary signal and is unaffected.
+- **Wheel identity (A/B) is proximity-based.** The two physical wheels use the
+  same marker colors, so the tracker cannot tell them apart from color alone;
+  it keeps labels by nearest-position matching between frames.
+- **Crossing/close wheels:** when wheels come closer than `ambiguityDist`
+  (120 px default), both readouts show "identity uncertain". After a full
+  pass-through, labels may be swapped between the physical wheels. Keep the
+  wheels apart in play, or give each wheel its own colors later.
+- **Occlusion:** a wheel whose dots disappear keeps its label for ~10 frames
+  (shown as "marker lost"), then is dropped. On reappearance after a long
+  occlusion it re-enters as a fresh wheel - identity across long occlusions is
+  not guaranteed. Short occlusions keep the label.
+- All of the above is covered by tests in `tests/run-tests.js` (simulated
+  data).
+
 ## Roadmap
 
 1. **This milestone**: two-wheel marker tracking, position + angle readouts.

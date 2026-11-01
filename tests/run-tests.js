@@ -120,5 +120,103 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
   check('smoothed series is sane', isFinite(varr(sm)) && varr(sm) < varr(raw) * 4);
 }
 
+// --- crossing: proximity identity must flag uncertainty, not stay silent ---
+{
+  const W = 320, H = 240;
+  // wheels approach head-on, meet at t=2.5 (both at x=160), pass through
+  const cross = (t) => [
+    { cx: 60 + t * 40, cy: 120, angle: t * 1.5, wheelR: 30, cDotR: 8, pDotR: 8, ptrR: 20 },
+    { cx: 260 - t * 40, cy: 120, angle: -t * 1.2, wheelR: 30, cDotR: 8, pDotR: 8, ptrR: 20 }
+  ];
+  const sim = S.createSimulator(W, H, cross);
+  const cfg = T.defaultConfig();
+  cfg.ambiguityDist = 80;
+  const state = T.createState();
+  let flagged = false, maxWheelsSeen = 0;
+  for (let f = 0; f <= 100; f++) {
+    const t = f / 20;
+    T.step(state, sim.draw(t), cfg, f * 50);
+    maxWheelsSeen = Math.max(maxWheelsSeen, state.wheels.length);
+    if (state.wheels.some(wh => wh.ambiguous)) flagged = true;
+  }
+  check('crossing: ambiguity flagged while wheels close', flagged);
+  check('crossing: tracker never invents extra wheels', maxWheelsSeen <= 2, 'max ' + maxWheelsSeen);
+  // NOTE: after a full pass-through, labels MAY be swapped between the physical
+  // wheels. That is the documented limit of proximity identity; the flag above
+  // is the honest signal. We assert exposure, not correct identity.
+}
+
+// --- occlusion: one wheel loses its pointer, the other keeps tracking ---
+{
+  const W = 320, H = 240;
+  let occlude = false;
+  const occ = (t) => [
+    { cx: 90, cy: 120, angle: t, wheelR: 30, cDotR: 8, pDotR: 8, ptrR: 20 },
+    { cx: 230, cy: 120, angle: -t, wheelR: 30, cDotR: 8, pDotR: occlude ? 0 : 8, ptrR: 20 }
+  ];
+  const sim = S.createSimulator(W, H, occ);
+  const cfg = T.defaultConfig();
+  const state = T.createState();
+  for (let f = 0; f < 10; f++) T.step(state, sim.draw(f / 20), cfg, f * 33);
+  occlude = true;
+  let otherOk = true;
+  for (let f = 10; f < 25; f++) {
+    T.step(state, sim.draw(f / 20), cfg, f * 33);
+    const a = state.wheels.find(wh => wh.x < 160);
+    if (!a || !isFinite(a.angleDeg)) otherOk = false;
+  }
+  check('occlusion: unoccluded wheel keeps tracking', otherOk);
+  check('occlusion: occluded wheel dropped after maxLost',
+    state.wheels.length === 1, 'got ' + state.wheels.length);
+  occlude = false;
+  let seenAtReacq = null, reacqFrame = null;
+  for (let f = 25; f < 45; f++) {
+    T.step(state, sim.draw(f / 20), cfg, f * 33);
+    const b = state.wheels.find(wh => wh.x >= 160);
+    if (b && seenAtReacq === null) { seenAtReacq = b.seen; reacqFrame = f; }
+  }
+  // long occlusion means a fresh wheel entry (low seen count at reappearance),
+  // possibly a new label - identity across long occlusions is not guaranteed
+  check('reacquisition after long occlusion works (fresh entry)',
+    seenAtReacq !== null && seenAtReacq <= 3,
+    seenAtReacq === null ? 'never reacquired' : 'seen=' + seenAtReacq + ' at f' + reacqFrame);
+}
+
+// --- short occlusion keeps identity ---
+{
+  const W = 320, H = 240;
+  let occlude = false;
+  const occ = (t) => [
+    { cx: 90, cy: 120, angle: t, wheelR: 30, cDotR: 8, pDotR: 8, ptrR: 20 },
+    { cx: 230, cy: 120, angle: -t, wheelR: 30, cDotR: 8, pDotR: occlude ? 0 : 8, ptrR: 20 }
+  ];
+  const sim = S.createSimulator(W, H, occ);
+  const cfg = T.defaultConfig();
+  const state = T.createState();
+  let labelBefore = null;
+  for (let f = 0; f < 10; f++) {
+    T.step(state, sim.draw(f / 20), cfg, f * 33);
+    const b = state.wheels.find(wh => wh.x >= 160);
+    if (b) labelBefore = b.label;
+  }
+  occlude = true;
+  let lostWasFlagged = false;
+  for (let f = 10; f < 14; f++) { // 4 frames < maxLost
+    T.step(state, sim.draw(f / 20), cfg, f * 33);
+    const b = state.wheels.find(wh => wh.x >= 160);
+    if (b && b.lost > 0) lostWasFlagged = true;
+  }
+  occlude = false;
+  let labelAfter = null;
+  for (let f = 14; f < 24; f++) {
+    T.step(state, sim.draw(f / 20), cfg, f * 33);
+    const b = state.wheels.find(wh => wh.x >= 160);
+    if (b) labelAfter = b.label;
+  }
+  check('short occlusion: same label kept', labelBefore === labelAfter,
+    labelBefore + ' -> ' + labelAfter);
+  check('short occlusion: loss was flagged while hidden', lostWasFlagged);
+}
+
 console.log(failures === 0 ? '\nALL TESTS PASSED (simulated data)' : '\n' + failures + ' FAILURES');
 process.exit(failures === 0 ? 0 : 1);

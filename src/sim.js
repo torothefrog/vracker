@@ -21,7 +21,9 @@
   const BODY_RGB = [35, 38, 46];      // dark grey wheel body
   const BG_RGB = [22, 24, 30];
 
-  function createSimulator(width, height) {
+  // truthFn(t) may be supplied by tests/scenarios; entries:
+  // {cx, cy, angle, wheelR, cDotR, pDotR, ptrR} (dot radius 0 = occluded dot)
+  function createSimulator(width, height, truthFn) {
     const buf = new Uint8ClampedArray(width * height * 4);
 
     function fill(rgb) {
@@ -45,31 +47,33 @@
     }
 
     // Ground-truth wheel paths. Deterministic in t (seconds).
-    function truth(t) {
+    // Paths keep the wheels well apart (proximity pairing needs that).
+    function defaultTruth(t) {
       return [
         {
-          cx: width * 0.30 + 55 * Math.cos(t * 0.7),
-          cy: height * 0.5 + 45 * Math.sin(t * 1.1),
+          cx: width * 0.27 + width * 0.07 * Math.cos(t * 0.7),
+          cy: height * 0.5 + height * 0.19 * Math.sin(t * 1.1),
           angle: t * (Math.PI / 2),              // +90 deg/s
-          wheelR: 46, dotR: 9, ptrR: 30
+          wheelR: 46, cDotR: 9, pDotR: 9, ptrR: 30
         },
         {
-          cx: width * 0.70 + 60 * Math.sin(t * 0.5 + 1.3),
-          cy: height * 0.5 + 50 * Math.cos(t * 0.9),
+          cx: width * 0.73 + width * 0.07 * Math.sin(t * 0.5 + 1.3),
+          cy: height * 0.5 + height * 0.19 * Math.cos(t * 0.9),
           angle: -t * (Math.PI / 4) + 0.8,       // -45 deg/s
-          wheelR: 46, dotR: 9, ptrR: 30
+          wheelR: 46, cDotR: 9, pDotR: 9, ptrR: 30
         }
       ];
     }
+    const truth = truthFn || defaultTruth;
 
     function draw(t) {
       fill(BG_RGB);
       for (const wh of truth(t)) {
-        disc(wh.cx, wh.cy, wh.wheelR, BODY_RGB);
+        if (wh.wheelR > 0) disc(wh.cx, wh.cy, wh.wheelR, BODY_RGB);
         const px = wh.cx + wh.ptrR * Math.cos(wh.angle);
         const py = wh.cy + wh.ptrR * Math.sin(wh.angle);
-        disc(px, py, wh.dotR, POINTER_RGB);
-        disc(wh.cx, wh.cy, wh.dotR, CENTER_RGB);
+        if (wh.pDotR > 0) disc(px, py, wh.pDotR, POINTER_RGB);
+        if (wh.cDotR > 0) disc(wh.cx, wh.cy, wh.cDotR, CENTER_RGB);
       }
       return { data: buf, width, height };
     }

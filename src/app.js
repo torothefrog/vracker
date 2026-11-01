@@ -134,7 +134,10 @@
       }
       const deg = ((wh.angleDeg % 360) + 360) % 360;
       card.innerHTML =
-        '<h2>Wheel ' + wh.label + (wh.lost > 0 ? ' <span class="lost">(marker lost)</span>' : '') + '</h2>' +
+        '<h2>Wheel ' + wh.label +
+        (wh.lost > 0 ? ' <span class="lost">(marker lost)</span>' : '') +
+        (wh.ambiguous ? ' <span class="lost">(identity uncertain - wheels too close)</span>' : '') +
+        '</h2>' +
         '<div class="val">x ' + wh.x.toFixed(1) + ' px &nbsp; y ' + wh.y.toFixed(1) + ' px</div>' +
         '<div class="val">angle ' + deg.toFixed(1) + ' deg</div>' +
         '<div class="val">speed ' + wh.angVel.toFixed(0) + ' deg/s</div>';

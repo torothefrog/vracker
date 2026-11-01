@@ -110,6 +110,8 @@
       maxPairDist: 220,     // px; center-to-pointer distance on a physical wheel
       maxJump: 120,         // px; max plausible wheel motion between frames
       maxLost: 10,          // frames a wheel may go missing before being dropped
+      ambiguityDist: 120,   // px; wheels closer than this are flagged ambiguous:
+                            // proximity pairing/identity cannot be trusted
       velSmooth: 0.25,      // EMA factor for angular velocity
       posSmooth: 0.5        // EMA factor for reported position
     };
@@ -154,6 +156,17 @@
       if (obs.length >= cfg.maxWheels) break;
     }
 
+    // Flag close pairs: when two wheels nearly touch, a pointer dot can be
+    // nearer to the wrong center, and identity matching is by proximity only.
+    // Expose that uncertainty instead of hiding it.
+    for (const o of obs) o.ambiguous = false;
+    for (let i = 0; i < obs.length; i++) {
+      for (let j = i + 1; j < obs.length; j++) {
+        const d = Math.hypot(obs[i].center.x - obs[j].center.x, obs[i].center.y - obs[j].center.y);
+        if (d < cfg.ambiguityDist) { obs[i].ambiguous = true; obs[j].ambiguous = true; }
+      }
+    }
+
     // Match observations to existing wheels by nearest midpoint.
     const usedW = new Set();
     for (const o of obs) {
@@ -192,6 +205,7 @@
       angleRaw: o.angle,       // last raw atan2, radians (-PI..PI]
       angleDeg: deg,           // continuous, unwrapped
       angVel: 0,               // deg/s, smoothed
+      ambiguous: !!o.ambiguous,
       lost: 0,
       center: o.center, pointer: o.pointer,
       seen: 1
@@ -212,6 +226,7 @@
     wh.y += cfg.posSmooth * (o.y - wh.y);
     wh.center = o.center;
     wh.pointer = o.pointer;
+    wh.ambiguous = !!o.ambiguous;
     wh.lost = 0;
     wh.seen++;
   }
