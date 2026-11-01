@@ -42,7 +42,8 @@
     starScore: 50,
     dodgeScore: 5,       // per asteroid survived past the ships
     scorePerS: 10,       // survival trickle
-    fullTurnDeg: 150     // wheel degrees from center for full deflection
+    fullTurnDeg: 150,    // wheel degrees from center for full deflection
+    shipGap: 2.6         // min x distance between ships (wingspan is ~2.4)
   };
 
   function createGame(opts) {
@@ -144,13 +145,17 @@
       if (s.inv > 0) s.inv -= dt;
     }
 
-    // Gentle ship-ship separation so the two rockets never overlap visually.
-    const dx = state.ships[1].x - state.ships[0].x;
-    const minGap = 1.9;
-    if (Math.abs(dx) < minGap) {
-      const push = (minGap - Math.abs(dx)) / 2 * (dx >= 0 ? 1 : -1);
-      state.ships[0].x = Math.max(-cfg.laneW, state.ships[0].x - push);
-      state.ships[1].x = Math.min(cfg.laneW, state.ships[1].x + push);
+    // Ship-ship separation: the two rockets never overlap visually. Steering
+    // still applies; positions are re-balanced around the midpoint only when
+    // the ships would intrude into each other.
+    const minGap = cfg.shipGap;
+    let a = state.ships[0].x, b = state.ships[1].x;
+    if (Math.abs(b - a) < minGap) {
+      const m = (a + b) / 2;
+      a = m - minGap / 2; b = m + minGap / 2;
+      if (a < -cfg.laneW) { a = -cfg.laneW; b = a + minGap; }
+      if (b > cfg.laneW) { b = cfg.laneW; a = b - minGap; }
+      state.ships[0].x = a; state.ships[1].x = b;
     }
 
     // Spawning ramps up over time.

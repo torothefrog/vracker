@@ -82,6 +82,8 @@ import * as THREE from 'three';
   });
   refreshMute();
 
+  const shipMeshes = [];   // filled below by buildShip; fitCamera scales these
+
   // ---------- Renderer / scene ----------
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -95,11 +97,16 @@ import * as THREE from 'three';
 
   // Pull the camera back on narrow (portrait) screens so both lane edges and
   // both ships stay in view. Ships live at z=0 within x +/- ~8.
+  let shipScaleNow = 1;
   function fitCamera() {
     const halfFovH = Math.atan(Math.tan(camera.fov * Math.PI / 360) * camera.aspect);
-    const need = 8.2 / Math.max(Math.tan(halfFovH), 0.05);
-    camera.position.z = Math.max(9.5, Math.min(need, 30));
-    camera.position.y = 4.6 + (camera.position.z - 9.5) * 0.35;
+    const need = 8.0 / Math.max(Math.tan(halfFovH), 0.05);
+    camera.position.z = Math.max(9.5, Math.min(need, 24));
+    camera.position.y = 4.6 + (camera.position.z - 9.5) * 0.3;
+    // Portrait zooms far out; scale the rockets up so they stay readable.
+    // The separation gap scales with them so wings still never overlap.
+    shipScaleNow = camera.position.z > 13 ? 1.45 : 1;
+    for (const m of shipMeshes) m.scale.set(shipScaleNow, shipScaleNow, shipScaleNow);
   }
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
@@ -235,10 +242,11 @@ import * as THREE from 'three';
     scene.add(g);
     return g;
   }
-  const shipMeshes = [
+  shipMeshes.push(
     buildShip(0x35d07f, 0x1e7a4c),   // player A: green (matches wheel A)
     buildShip(0x41b8f5, 0x1f6fa8)    // player B: blue (matches wheel B)
-  ];
+  );
+  fitCamera();                       // apply initial ship scale
 
   // ---------- Asteroids / stars / particles ----------
   const AST_COLORS = [0xc98a5e, 0xa06be0, 0x7fd4c1, 0xe0b34f, 0xd97b8f];
@@ -511,6 +519,7 @@ import * as THREE from 'three';
       G.step(game, dt, inputFor(0), inputFor(1));
     }
 
+    game.cfg.shipGap = 2.6 * shipScaleNow; // gap follows visual ship scale
     wheels.update(performance.now());
     handleEvents();
     syncMeshes();
@@ -525,17 +534,21 @@ import * as THREE from 'three';
     }
     starGeo.attributes.position.needsUpdate = true;
 
-    // Camera shake decay (around the fitted base position)
-    const baseY = 4.6 + (camera.position.z - 9.5) * 0.35;
+    // Camera shake decay (around the fitted base position). On narrow screens
+    // (camera pulled back) the view pans with the ships' midpoint so both
+    // players stay in frame even when both steer the same way.
+    const baseY = 4.6 + (camera.position.z - 9.5) * 0.3;
+    const midX = (game.ships[0].x + game.ships[1].x) / 2;
+    const baseX = camera.position.z > 13 ? Math.max(-3.2, Math.min(3.2, midX * 0.55)) : 0;
     if (shake > 0) {
       shake = Math.max(0, shake - dt * 1.8);
-      camera.position.x = (Math.random() - 0.5) * shake * 0.7;
+      camera.position.x = baseX + (Math.random() - 0.5) * shake * 0.7;
       camera.position.y = baseY + (Math.random() - 0.5) * shake * 0.5;
     } else {
-      camera.position.x = 0;
+      camera.position.x += (baseX - camera.position.x) * Math.min(1, dt * 4);
       camera.position.y = baseY;
     }
-    camera.lookAt(0, 0.4, -14);
+    camera.lookAt(camera.position.x, 0.4, -14);
 
     hudScore.textContent = 'score ' + Math.floor(game.score);
     drawHearts();

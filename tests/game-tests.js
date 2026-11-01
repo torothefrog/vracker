@@ -36,7 +36,7 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
   check('ship B clamps at right lane edge', near(g.ships[1].x, g.cfg.laneW, 0.01),
     'x=' + g.ships[1].x.toFixed(2));
   check('ship A stops one gap left of the edge',
-    g.ships[0].x > 3.5 && g.ships[0].x <= g.cfg.laneW, 'x=' + g.ships[0].x.toFixed(2));
+    near(g.ships[0].x, g.cfg.laneW - g.cfg.shipGap, 0.05), 'x=' + g.ships[0].x.toFixed(2));
 }
 {
   const g = G.createGame({ rng: G.seededRng(11) });
@@ -54,7 +54,7 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
   // drive both toward center hard
   for (let i = 0; i < 300; i++) G.step(g, 1 / 60, 1, -1);
   const gap = g.ships[1].x - g.ships[0].x;
-  check('ships keep a minimum visual gap', gap >= 1.85, 'gap=' + gap.toFixed(2));
+  check('ships keep a minimum visual gap', near(gap, g.cfg.shipGap, 0.05), 'gap=' + gap.toFixed(2));
 }
 
 // --- collision: heart loss, invulnerability window, game over ---
