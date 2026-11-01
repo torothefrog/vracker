@@ -93,11 +93,40 @@ runs locally in the browser; no frames leave the device.
 - All of the above is covered by tests in `tests/run-tests.js` (simulated
   data).
 
+## Space Dodgers (milestone 2: the game)
+
+`game.html` is the first game built on the tracker: **two ships on one shared
+screen dodging asteroids**. Each wheel steers its ship - turn the physical
+wheel right and the ship banks right; back to the baseline is straight ahead.
+Keyboard (A/D and arrow keys) and touch (drag left/right half) steer too, so
+the game is playable without the camera.
+
+- **Co-op for kids**: one shared pool of five hearts, gold stars to catch,
+  a best score saved in the browser. Difficulty ramps the longer you survive.
+- **3D, original visuals**: low-poly rockets, asteroids and planets built in
+  code with [Three.js](https://threejs.org) (vendored in `vendor/`, MIT
+  licence). No external art assets; the look follows the direction of the
+  reference images without copying them.
+- **Architecture**: `src/game/core.js` holds the rules (pure JS, Node-tested);
+  `src/game/game3d.js` only renders; `src/game/wheelinput.js` turns tracker
+  output into steering (angle offset from a baseline set at start / recenter,
+  150 deg of wheel turn = full deflection). The tracker itself is unchanged.
+- **Tests**: `node tests/game-tests.js` covers steering mapping, lane clamps,
+  ship separation, collisions/invulnerability/game-over, star collection,
+  pair-spawn gaps, difficulty ramp, and dodge scoring - all deterministic
+  (seeded RNG). The browser page also has a `?test=1` harness that simulates
+  a fixed run and reports JSON into the page for headless checks.
+
+Like the tracker, everything runs locally on the device; no frames or scores
+leave the browser (the best score stays in localStorage).
+
 ## Roadmap
 
-1. **This milestone**: two-wheel marker tracking, position + angle readouts.
+1. ~~This milestone~~: two-wheel marker tracking, position + angle readouts. **Done.**
 2. Real-camera validation on Toro's machine; tune marker size/color/lighting.
-3. Input abstraction so a game layer can consume wheel state.
+3. ~~Input abstraction so a game layer can consume wheel state~~. **Done** -
+   Space Dodgers steers with wheel angle.
+4. Real-camera game validation: does wheel steering feel good enough for kids?
 4. Optional: bare-hand tracking as an alternative input (MediaPipe), game.
 
 ## License

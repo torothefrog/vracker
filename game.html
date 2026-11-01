@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Vracker Space Dodgers</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; overflow: hidden; background: #150b28; color: #fff;
+    font: 16px/1.4 system-ui, sans-serif; }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  .hud { position: fixed; top: 10px; left: 0; right: 0; display: flex;
+    justify-content: center; gap: 28px; align-items: baseline; pointer-events: none;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.7); }
+  #hearts { color: #ff6b8a; font-size: 26px; letter-spacing: 3px; }
+  #score { font-size: 24px; font-weight: 700; }
+  #best { font-size: 15px; color: #cbb8ff; }
+
+  .topbar { position: fixed; top: 8px; right: 10px; display: flex; gap: 8px; }
+  .topbar button, .overlay button {
+    background: rgba(43,48,64,0.85); color: #fff; border: 1px solid #4c5470;
+    border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+  .topbar button:hover, .overlay button:hover { background: rgba(60,67,88,0.95); }
+
+  #preview { position: fixed; left: 10px; bottom: 10px; width: 200px; border-radius: 8px;
+    border: 2px solid rgba(255,255,255,0.35); display: none; background: #000; }
+  #status { position: fixed; bottom: 10px; left: 0; right: 0; text-align: center;
+    color: #d8ccff; font-size: 13px; text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    pointer-events: none; padding: 0 220px; }
+  @media (max-width: 760px) {
+    .topbar { top: auto; bottom: 8px; right: 8px; flex-direction: column; gap: 5px; }
+    .topbar button { font-size: 11px; padding: 5px 8px; }
+    #status { padding: 0 12px; bottom: 8px; left: 0; right: 120px; font-size: 11px; text-align: left; }
+    #hearts { font-size: 19px; }
+    #score { font-size: 18px; }
+    #best { font-size: 12px; }
+    .hud { gap: 12px; }
+    #preview { width: 130px; }
+  }
+
+  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; text-align: center;
+    background: rgba(12,6,28,0.72); backdrop-filter: blur(3px); z-index: 5; padding: 20px; }
+  .overlay h1 { font-size: clamp(30px, 6vw, 54px); margin: 0; letter-spacing: 2px;
+    background: linear-gradient(180deg, #7ce7ff 15%, #3f9dff 45%, #ffd23f 55%, #ff8a3d 90%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 3px 0 rgba(0,0,0,0.45)); }
+  .overlay p { max-width: 520px; margin: 2px 0; color: #e6deff; }
+  .overlay .big { font-size: 19px; padding: 14px 34px; border-radius: 12px;
+    background: linear-gradient(180deg, #3f9dff, #2b6fd6); border-color: #7cc0ff;
+    font-weight: 700; }
+  .overlay .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .score-line { font-size: 24px; font-weight: 700; }
+  .hint { font-size: 13px; color: #b3a6dd; }
+  a { color: #7dd3fc; }
+  #testlog { position: fixed; left: 0; bottom: 0; font-size: 10px; color: #0f0; z-index: 50;
+    background: rgba(0,0,0,0.6); max-width: 100%; word-break: break-all; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div class="hud">
+  <div id="hearts"></div>
+  <div id="score">score 0</div>
+  <div id="best">best 0</div>
+</div>
+
+<div class="topbar">
+  <button id="btnCamera2">wheel camera</button>
+  <button id="btnRecenter">recenter wheels</button>
+  <button id="btnMute">sound: on</button>
+  <button onclick="location.href='index.html'">tracker page</button>
+</div>
+
+<canvas id="preview" width="320" height="240"></canvas>
+<video id="cam" playsinline muted style="display:none"></video>
+<div id="status"></div>
+<div id="testlog"></div>
+
+<div class="overlay" id="startOverlay">
+  <h1>SPACE DODGERS</h1>
+  <p>Two ships, one screen, endless asteroids. Dodge the rocks, catch the stars,
+    and keep your five hearts as long as you can.</p>
+  <p><b style="color:#35d07f">Ship A</b> turns with the green wheel (or A/D keys, or drag the left half).
+     <b style="color:#41b8f5">Ship B</b> turns with the blue wheel (or ←/→ keys, or drag the right half).</p>
+  <div class="row">
+    <button class="big" id="btnStart">START</button>
+    <button id="btnCamera">use wheel camera</button>
+  </div>
+  <p class="hint">Camera stays on this device - nothing is uploaded. Hold both wheels level and
+    press START (or "recenter wheels") so straight ahead is straight ahead.</p>
+</div>
+
+<div class="overlay" id="overOverlay" style="display:none">
+  <h1>GAME OVER</h1>
+  <div class="score-line" id="overScore"></div>
+  <div id="overBest" class="hint"></div>
+  <button class="big" id="btnRestart">PLAY AGAIN</button>
+  <p class="hint">Enter / Space also restarts.</p>
+</div>
+
+<script src="src/tracker.js"></script>
+<script src="src/game/core.js"></script>
+<script src="src/game/wheelinput.js"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+<script type="module" src="src/game/game3d.js"></script>
+</body>
+</html>
