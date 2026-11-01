@@ -15,9 +15,10 @@
 <body>
 <h1>Vracker wheel markers</h1>
 <p>Print at 100% (A4), cut out each disc, and stick it on something that spins freely
-(cardboard, a jar lid, a fidget spinner base). The green dot is the wheel center;
-the magenta dot marks the angle. Keep both dots visible to the camera and the two
-wheels a hand's width apart.</p>
+(cardboard, a jar lid, a fidget spinner base). Each wheel has its own color pair:
+wheel A is GREEN center + MAGENTA pointer, wheel B is CYAN center + YELLOW pointer.
+That is how the tracker tells the players apart - do not mix the colors between wheels.
+Keep both dots of a wheel visible to the camera.</p>
 <p>Printing in black and white will NOT work - the tracker finds the dots by color.
 If your printer's greens/magentas differ a lot, open the app and use
 "sample center/pointer color" to calibrate.</p>
@@ -30,17 +31,17 @@ If your printer's greens/magentas differ a lot, open the app and use
       <circle cx="50" cy="50" r="7" fill="#00e65a"/>
       <text x="50" y="96" text-anchor="middle" font-size="4" fill="#555">wheel disc - cut on dashed line</text>
     </svg>
-    <div class="cap">Wheel A</div>
+    <div class="cap">Wheel A - green + magenta</div>
   </div>
   <div class="wheel">
     <svg width="100mm" height="100mm" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
       <circle cx="50" cy="50" r="48" fill="#ffffff" stroke="#111" stroke-width="0.6" stroke-dasharray="3 2"/>
       <circle cx="50" cy="50" r="30" fill="none" stroke="#bbb" stroke-width="0.3"/>
-      <circle cx="80" cy="50" r="7" fill="#e600dc"/>
-      <circle cx="50" cy="50" r="7" fill="#00e65a"/>
+      <circle cx="80" cy="50" r="7" fill="#f0dc00"/>
+      <circle cx="50" cy="50" r="7" fill="#00c8e6"/>
       <text x="50" y="96" text-anchor="middle" font-size="4" fill="#555">wheel disc - cut on dashed line</text>
     </svg>
-    <div class="cap">Wheel B</div>
+    <div class="cap">Wheel B - cyan + yellow</div>
   </div>
 </div>
 </body>

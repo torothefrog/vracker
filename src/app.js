@@ -10,10 +10,13 @@
   const simBadge = document.getElementById('simBadge');
   const btnCamera = document.getElementById('btnCamera');
   const btnSim = document.getElementById('btnSim');
-  const btnCalCenter = document.getElementById('btnCalCenter');
-  const btnCalPointer = document.getElementById('btnCalPointer');
-  const swCenter = document.getElementById('swCenter');
-  const swPointer = document.getElementById('swPointer');
+  const btnCalA = document.getElementById('btnCalA');
+  const btnCalB = document.getElementById('btnCalB');
+  const swatches = {
+    A: { center: document.getElementById('swACenter'), pointer: document.getElementById('swAPointer') },
+    B: { center: document.getElementById('swBCenter'), pointer: document.getElementById('swBPointer') }
+  };
+  const WHEEL_LINE = { A: '#4ade80', B: '#38bdf8' }; // overlay accent per wheel
 
   const cfg = T.defaultConfig();
   const state = T.createState();
@@ -29,8 +32,10 @@
     return 'hsl(' + def.hue + ', 90%, 55%)';
   }
   function refreshSwatches() {
-    swCenter.style.background = hsvCss(cfg.centerColor);
-    swPointer.style.background = hsvCss(cfg.pointerColor);
+    for (const def of cfg.wheels) {
+      swatches[def.label].center.style.background = hsvCss(def.center);
+      swatches[def.label].pointer.style.background = hsvCss(def.pointer);
+    }
   }
   refreshSwatches();
 
@@ -63,14 +68,16 @@
     setStatus('Simulation running: synthetic wheels, same pipeline. Not your camera.');
   });
 
-  function armCalibration(which, btn) {
-    calibrate = which;
-    btnCalCenter.classList.toggle('armed', which === 'center');
-    btnCalPointer.classList.toggle('armed', which === 'pointer');
-    setStatus('Click a ' + which + ' marker in the image to sample its color.');
+  // Two-click calibration per wheel: arm, click the CENTER dot, then the
+  // POINTER dot. Needed when printer colors or lighting differ from defaults.
+  function armCalibration(label, btn) {
+    calibrate = { label, stage: 'center' };
+    btnCalA.classList.toggle('armed', label === 'A');
+    btnCalB.classList.toggle('armed', label === 'B');
+    setStatus('Calibrating wheel ' + label + ': click its CENTER dot.');
   }
-  btnCalCenter.addEventListener('click', () => armCalibration('center', btnCalCenter));
-  btnCalPointer.addEventListener('click', () => armCalibration('pointer', btnCalPointer));
+  btnCalA.addEventListener('click', () => armCalibration('A', btnCalA));
+  btnCalB.addEventListener('click', () => armCalibration('B', btnCalB));
 
   view.addEventListener('click', (ev) => {
     if (!calibrate || !lastFrame) return;
@@ -79,15 +86,22 @@
     const y = Math.floor((ev.clientY - r.top) * view.height / r.height);
     const p = (y * lastFrame.width + x) * 4;
     const [h, s, v] = T.rgbToHsv(lastFrame.data[p], lastFrame.data[p + 1], lastFrame.data[p + 2]);
-    const def = calibrate === 'center' ? cfg.centerColor : cfg.pointerColor;
+    const wheelDef = cfg.wheels.find(d => d.label === calibrate.label);
+    const def = calibrate.stage === 'center' ? wheelDef.center : wheelDef.pointer;
     def.hue = h;
     def.satMin = Math.max(0.15, s - 0.25);
     def.valMin = Math.max(0.15, v - 0.25);
     refreshSwatches();
-    setStatus('Sampled ' + calibrate + ' marker: hue ' + h.toFixed(0) + ' deg. Tracking updated.');
-    calibrate = null;
-    btnCalCenter.classList.remove('armed');
-    btnCalPointer.classList.remove('armed');
+    if (calibrate.stage === 'center') {
+      calibrate.stage = 'pointer';
+      setStatus('Wheel ' + calibrate.label + ' center sampled (hue ' + h.toFixed(0) +
+        '). Now click its POINTER dot.');
+    } else {
+      setStatus('Wheel ' + calibrate.label + ' calibrated (center + pointer). Tracking updated.');
+      calibrate = null;
+      btnCalA.classList.remove('armed');
+      btnCalB.classList.remove('armed');
+    }
   });
 
   function sourceFrame(now) {
@@ -108,12 +122,13 @@
     ctx.lineWidth = 2;
     for (const wh of out.wheels) {
       const c = wh.center, p = wh.pointer;
+      const accent = WHEEL_LINE[wh.label] || '#7dd3fc';
       ctx.strokeStyle = 'rgba(255,255,255,0.6)';
       ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-      ctx.strokeStyle = '#7dd3fc';
+      ctx.strokeStyle = accent;
       ctx.beginPath(); ctx.moveTo(wh.x - 8, wh.y); ctx.lineTo(wh.x + 8, wh.y);
       ctx.moveTo(wh.x, wh.y - 8); ctx.lineTo(wh.x, wh.y + 8); ctx.stroke();
-      ctx.fillStyle = '#7dd3fc';
+      ctx.fillStyle = accent;
       ctx.font = '13px ui-monospace, monospace';
       const deg = ((wh.angleDeg % 360) + 360) % 360;
       ctx.fillText(wh.label + '  ' + deg.toFixed(0) + ' deg', wh.x + 12, wh.y - 8);
@@ -135,8 +150,7 @@
       const deg = ((wh.angleDeg % 360) + 360) % 360;
       card.innerHTML =
         '<h2>Wheel ' + wh.label +
-        (wh.lost > 0 ? ' <span class="lost">(marker lost)</span>' : '') +
-        (wh.ambiguous ? ' <span class="lost">(identity uncertain - wheels too close)</span>' : '') +
+        (wh.lost > 0 ? ' <span class="lost">(markers lost)</span>' : '') +
         '</h2>' +
         '<div class="val">x ' + wh.x.toFixed(1) + ' px &nbsp; y ' + wh.y.toFixed(1) + ' px</div>' +
         '<div class="val">angle ' + deg.toFixed(1) + ' deg</div>' +

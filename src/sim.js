@@ -15,9 +15,13 @@
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
 
-  // Marker colors (must sit inside the tracker's default hue windows):
-  const CENTER_RGB = [0, 230, 90];    // green
-  const POINTER_RGB = [230, 0, 220];  // magenta
+  // Per-wheel marker colors (must sit inside the tracker's default hue
+  // windows): wheel A green+magenta, wheel B cyan+yellow. Distinct pairs are
+  // what binds player identity to color.
+  const WHEEL_RGB = [
+    { center: [0, 230, 90],  pointer: [230, 0, 220] },  // wheel A
+    { center: [0, 200, 230], pointer: [240, 220, 0] }    // wheel B
+  ];
   const BODY_RGB = [35, 38, 46];      // dark grey wheel body
   const BG_RGB = [22, 24, 30];
 
@@ -68,17 +72,18 @@
 
     function draw(t) {
       fill(BG_RGB);
-      for (const wh of truth(t)) {
+      truth(t).forEach((wh, i) => {
+        const colors = WHEEL_RGB[i % WHEEL_RGB.length];
         if (wh.wheelR > 0) disc(wh.cx, wh.cy, wh.wheelR, BODY_RGB);
         const px = wh.cx + wh.ptrR * Math.cos(wh.angle);
         const py = wh.cy + wh.ptrR * Math.sin(wh.angle);
-        if (wh.pDotR > 0) disc(px, py, wh.pDotR, POINTER_RGB);
-        if (wh.cDotR > 0) disc(wh.cx, wh.cy, wh.cDotR, CENTER_RGB);
-      }
+        if (wh.pDotR > 0) disc(px, py, wh.pDotR, colors.pointer);
+        if (wh.cDotR > 0) disc(wh.cx, wh.cy, wh.cDotR, colors.center);
+      });
       return { data: buf, width, height };
     }
 
-    return { draw, truth, CENTER_RGB, POINTER_RGB };
+    return { draw, truth, WHEEL_RGB };
   }
 
   return { createSimulator };

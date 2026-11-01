@@ -7,6 +7,10 @@
  * distinguishable points, then compute their midpoint (position) and the angle
  * of the vector between them. Points are colored markers found by HSV
  * thresholding + connected-component labeling.
+ *
+ * Player identity: each wheel has its OWN center/pointer color pair
+ * (wheel A: green+magenta, wheel B: cyan+yellow), so identity is bound to
+ * color, not to proximity guessing - wheels can cross without swapping.
  */
 (function (root, factory) {
   const api = factory();
@@ -14,8 +18,6 @@
   else root.VrTracker = api;
 })(typeof self !== 'undefined' ? self : globalThis, function () {
   'use strict';
-
-  const TAU = Math.PI * 2;
 
   function rgbToHsv(r, g, b) {
     r /= 255; g /= 255; b /= 255;
@@ -99,112 +101,78 @@
     return blobs;
   }
 
-  const LABELS = 'ABCDEFGH';
-
   function defaultConfig() {
     return {
-      centerColor:  { hue: 140, hueTol: 30, satMin: 0.45, valMin: 0.35 }, // green tape
-      pointerColor: { hue: 300, hueTol: 30, satMin: 0.40, valMin: 0.35 }, // magenta tape
+      // Per-player color pairs. Wheel A = green center + magenta pointer,
+      // wheel B = cyan center + yellow pointer. Identity is bound to these.
+      wheels: [
+        { label: 'A',
+          center:  { hue: 140, hueTol: 30, satMin: 0.45, valMin: 0.35 },
+          pointer: { hue: 300, hueTol: 30, satMin: 0.40, valMin: 0.35 } },
+        { label: 'B',
+          center:  { hue: 190, hueTol: 25, satMin: 0.40, valMin: 0.35 },
+          pointer: { hue: 60,  hueTol: 25, satMin: 0.45, valMin: 0.45 } }
+      ],
       minArea: 12,          // px; blobs smaller than this are ignored
-      maxWheels: 2,
       maxPairDist: 220,     // px; center-to-pointer distance on a physical wheel
-      maxJump: 120,         // px; max plausible wheel motion between frames
       maxLost: 10,          // frames a wheel may go missing before being dropped
-      ambiguityDist: 120,   // px; wheels closer than this are flagged ambiguous:
-                            // proximity pairing/identity cannot be trusted
       velTau: 0.12,         // s; time constant for angular-velocity smoothing.
                             // Time-based (not per-frame) so jittery frame
                             // intervals do not spike the velocity estimate.
       posTau: 0.05,         // s; time constant for reported-position smoothing
       resetGapS: 1.0        // s; after a gap this long (tab hidden, stall),
-                            // drop identity and re-acquire instead of spawning
-                            // phantom wheels from stale positions
+                            // re-acquire fresh instead of trusting stale state
     };
   }
 
   function createState() {
-    return { wheels: [], lastTime: 0 };
+    return { wheels: {}, lastTime: 0 }; // wheels keyed by label (color-bound)
+  }
+
+  function observeWheel(def, frame, cfg) {
+    const w = frame.width, h = frame.height, data = frame.data;
+    const centers = findBlobs(thresholdMask(data, w, h, def.center), w, h, cfg.minArea)
+      .sort((a, b) => b.area - a.area);
+    if (!centers.length) return null;
+    const pointers = findBlobs(thresholdMask(data, w, h, def.pointer), w, h, cfg.minArea)
+      .sort((a, b) => b.area - a.area);
+    if (!pointers.length) return null;
+    const c = centers[0];
+    let best = null, bd = Infinity;
+    for (const p of pointers) {
+      const d = Math.hypot(p.x - c.x, p.y - c.y);
+      if (d < bd) { bd = d; best = p; }
+    }
+    if (!best || bd > cfg.maxPairDist) return null;
+    return {
+      x: (c.x + best.x) / 2,
+      y: (c.y + best.y) / 2,
+      angle: Math.atan2(best.y - c.y, best.x - c.x),
+      center: c, pointer: best
+    };
   }
 
   function step(state, frame, cfg, nowMs) {
-    const w = frame.width, h = frame.height, data = frame.data;
     const dtRaw = state.lastTime ? (nowMs - state.lastTime) / 1000 : 0;
-    if (dtRaw > cfg.resetGapS) state.wheels = []; // long pause: re-acquire fresh
+    if (dtRaw > cfg.resetGapS) state.wheels = {}; // long pause: re-acquire fresh
     const dt = Math.min(dtRaw, 0.5);
     state.lastTime = nowMs;
 
-    const centerMask = thresholdMask(data, w, h, cfg.centerColor);
-    const centers = findBlobs(centerMask, w, h, cfg.minArea)
-      .sort((a, b) => b.area - a.area).slice(0, cfg.maxWheels * 2);
-    const pointerMask = thresholdMask(data, w, h, cfg.pointerColor);
-    const pointers = findBlobs(pointerMask, w, h, cfg.minArea)
-      .sort((a, b) => b.area - a.area).slice(0, cfg.maxWheels * 3);
-
-    // Pair each center with its nearest free pointer.
-    const usedP = new Set();
-    const obs = [];
-    for (const c of centers) {
-      let best = -1, bd = Infinity;
-      for (let j = 0; j < pointers.length; j++) {
-        if (usedP.has(j)) continue;
-        const p = pointers[j];
-        const d = Math.hypot(p.x - c.x, p.y - c.y);
-        if (d < bd) { bd = d; best = j; }
-      }
-      if (best < 0 || bd > cfg.maxPairDist) continue;
-      usedP.add(best);
-      const p = pointers[best];
-      obs.push({
-        x: (c.x + p.x) / 2,
-        y: (c.y + p.y) / 2,
-        angle: Math.atan2(p.y - c.y, p.x - c.x),
-        center: c, pointer: p
-      });
-      if (obs.length >= cfg.maxWheels) break;
-    }
-
-    // Flag close pairs: when two wheels nearly touch, a pointer dot can be
-    // nearer to the wrong center, and identity matching is by proximity only.
-    // Expose that uncertainty instead of hiding it.
-    for (const o of obs) o.ambiguous = false;
-    for (let i = 0; i < obs.length; i++) {
-      for (let j = i + 1; j < obs.length; j++) {
-        const d = Math.hypot(obs[i].center.x - obs[j].center.x, obs[i].center.y - obs[j].center.y);
-        if (d < cfg.ambiguityDist) { obs[i].ambiguous = true; obs[j].ambiguous = true; }
+    for (const def of cfg.wheels) {
+      const obs = observeWheel(def, frame, cfg);
+      const wh = state.wheels[def.label];
+      if (obs) {
+        if (wh) updateWheel(wh, obs, dt, cfg);
+        else state.wheels[def.label] = newWheel(def.label, obs);
+      } else if (wh) {
+        wh.lost++;
+        if (wh.lost > cfg.maxLost) delete state.wheels[def.label];
       }
     }
-
-    // Match observations to existing wheels by nearest midpoint.
-    const usedW = new Set();
-    for (const o of obs) {
-      let bi = -1, bd = Infinity;
-      for (let k = 0; k < state.wheels.length; k++) {
-        if (usedW.has(k)) continue;
-        const wh = state.wheels[k];
-        if (wh.lost > cfg.maxLost) continue;
-        const d = Math.hypot(o.x - wh.x, o.y - wh.y);
-        if (d < bd) { bd = d; bi = k; }
-      }
-      if (bi >= 0 && bd <= cfg.maxJump) {
-        usedW.add(bi);
-        updateWheel(state.wheels[bi], o, dt, cfg);
-      } else {
-        state.wheels.push(newWheel(state, o));
-        usedW.add(state.wheels.length - 1);
-      }
-    }
-    for (const wh of state.wheels) {
-      if (!usedW.has(state.wheels.indexOf(wh))) wh.lost++;
-    }
-    state.wheels = state.wheels.filter(wh => wh.lost <= cfg.maxLost);
-
-    return { centers, pointers, wheels: state.wheels };
+    return { wheels: cfg.wheels.map(d => state.wheels[d.label]).filter(Boolean) };
   }
 
-  function newWheel(state, o) {
-    const usedLabels = new Set(state.wheels.map(wh => wh.label));
-    let label = '?';
-    for (const ch of LABELS) { if (!usedLabels.has(ch)) { label = ch; break; } }
+  function newWheel(label, o) {
     const deg = o.angle * 180 / Math.PI;
     return {
       label,
@@ -212,7 +180,6 @@
       angleRaw: o.angle,       // last raw atan2, radians (-PI..PI]
       angleDeg: deg,           // continuous, unwrapped
       angVel: 0,               // deg/s, smoothed
-      ambiguous: !!o.ambiguous,
       lost: 0,
       center: o.center, pointer: o.pointer,
       seen: 1
@@ -235,10 +202,9 @@
     wh.y += aP * (o.y - wh.y);
     wh.center = o.center;
     wh.pointer = o.pointer;
-    wh.ambiguous = !!o.ambiguous;
     wh.lost = 0;
     wh.seen++;
   }
 
-  return { rgbToHsv, hueDist, thresholdMask, findBlobs, defaultConfig, createState, step, TAU };
+  return { rgbToHsv, hueDist, thresholdMask, findBlobs, defaultConfig, createState, step };
 });
