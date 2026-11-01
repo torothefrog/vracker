@@ -331,8 +331,6 @@ import * as THREE from 'three';
 
   // ---------- Game state + inputs ----------
   const game = G.createGame({});
-  // Read-only diagnostic handle (used by live checks; handy for tinkering).
-  window.__vracker = { game, version: '2.1.0', wheels };
   let best = Number(localStorage.getItem('vracker-best') || 0);
   hudBest.textContent = 'best ' + best;
 
@@ -364,6 +362,9 @@ import * as THREE from 'three';
     preview,
     onStatus: setStatus
   });
+  // Read-only diagnostic handle (used by live checks; handy for tinkering).
+  window.__vracker = { game, version: '2.1.0', wheels };
+
   btnCamera.addEventListener('click', async () => { ensureAudio(); await wheels.start(); });
   btnCamera2.addEventListener('click', async () => { ensureAudio(); await wheels.start(); });
   btnRecenter.addEventListener('click', () => wheels.recenter());
