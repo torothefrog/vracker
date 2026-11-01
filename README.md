@@ -8,9 +8,11 @@ readouts**. No game layer yet.
 
 The plan (from `#project-vracker`): rather than recognising a hand and
 interpreting its pose, Vracker starts with markers. Each physical wheel carries
-two distinguishable colored dots - a green center dot and a magenta pointer
-dot. The tracker locates the two dots per wheel and computes their midpoint
-(wheel position) and the angle of the vector between them (wheel rotation).
+two distinguishable colored dots - a center dot and a pointer dot - and each
+player gets their own color pair: wheel A is green + magenta, wheel B is
+cyan + yellow. The tracker locates the two dots per wheel and computes their
+midpoint (wheel position) and the angle of the vector between them (wheel
+rotation).
 The same interface can later accept bare-hand tracking (e.g. MediaPipe) without
 rebuilding the game.
 
@@ -30,34 +32,37 @@ It is a static page - no build, no dependencies, no server-side anything.
 Click **Use camera** for the real feed, or **Simulation** to exercise the exact
 same pipeline on synthetic wheels without a camera.
 
-If the markers are not found, click **sample center/pointer color**, then click
-the marker in the image. Lighting and printer colors vary; calibration adapts
-the HSV thresholds.
+If a marker is not found, click **calibrate A** (or **B**), then click the
+wheel's center dot, then its pointer dot, in the image. Lighting and printer
+colors vary; calibration adapts the HSV thresholds.
 
 ## Build the wheels
 
-Open `print-markers.html` and print it at 100% on A4 - two 100 mm discs, each
-with a green center dot and a magenta pointer dot. Cut them out and stick them
-on anything that spins (cardboard, jar lids). Colored tape dots work just as
-well. Keep both dots visible and the two wheels apart - if the wheels nearly
-touch, a pointer dot can be closer to the wrong center and confuse pairing.
+Open `print-markers.html` and print it at 100% on A4 - two 100 mm discs:
+wheel A with a green center dot and magenta pointer dot, wheel B with a cyan
+center dot and yellow pointer dot. Cut them out and stick them on anything
+that spins (cardboard, jar lids). Colored tape dots work just as well - just
+keep each wheel on its own color pair, because that is how the tracker tells
+the players apart. Keep both dots of a wheel visible to the camera.
 
 ## Simulated vs real validation
 
 - `node tests/run-tests.js` runs the pipeline against **synthetic** frames with
-  known ground truth: midpoint and angle accuracy, rotation direction and
-  unwrapping, marker loss, smoothing. Passing tests prove the software, not
-  your camera, lighting, or markers.
+  known ground truth: midpoint and angle estimates within simulated tolerances
+  (2 px / 3 deg), rotation direction and unwrapping, crossing, occlusion,
+  reacquisition, jittery frame timing, long stalls. Passing tests prove the
+  software only - not your camera, lighting, or markers.
 - The browser **Simulation** mode is the same story, visually.
 - Real-camera validation happens on your machine with your wheels: that is the
   step that tells us whether marker tracking is good enough to build on.
 
 ## How it works
 
-`src/tracker.js` converts pixels to HSV, thresholds for each marker color,
-finds blobs with connected-component labeling, pairs each center dot with its
-nearest pointer dot, and tracks wheel identity frame to frame. Angle is
-unwrapped continuously and angular velocity is smoothed. `src/sim.js` is the
+`src/tracker.js` converts pixels to HSV, thresholds for each wheel's marker
+colors, finds blobs with connected-component labeling, and pairs each wheel's
+center dot with its nearest pointer dot of the matching color. Angle is
+unwrapped continuously; angular velocity and position use time-based smoothing
+(so jittery frame timing does not spike them). `src/sim.js` is the
 synthetic feed. `src/app.js` wires camera/simulation into the page. Everything
 runs locally in the browser; no frames leave the device.
 
@@ -65,18 +70,20 @@ runs locally in the browser; no frames leave the device.
 
 - **Position** is the midpoint of the two dots, not the exact wheel center:
   with the pointer dot at radius r, the reported position orbits the true
-  center by r/2. Angle is the primary signal and is unaffected.
-- **Wheel identity (A/B) is proximity-based.** The two physical wheels use the
-  same marker colors, so the tracker cannot tell them apart from color alone;
-  it keeps labels by nearest-position matching between frames.
-- **Crossing/close wheels:** when wheels come closer than `ambiguityDist`
-  (120 px default), both readouts show "identity uncertain". After a full
-  pass-through, labels may be swapped between the physical wheels. Keep the
-  wheels apart in play, or give each wheel its own colors later.
-- **Occlusion:** a wheel whose dots disappear keeps its label for ~10 frames
-  (shown as "marker lost"), then is dropped. On reappearance after a long
-  occlusion it re-enters as a fresh wheel - identity across long occlusions is
-  not guaranteed. Short occlusions keep the label.
+  center by r/2. Angle is the primary game input.
+- **Accuracy:** in simulation, midpoint and angle estimates land within 2 px /
+  3 deg of ground truth. Real-camera accuracy (lighting, printer colors,
+  focus, frame rate) is NOT yet validated - that is what the first run on
+  Toro's machine is for.
+- **Player identity is color-bound.** Wheel A and wheel B use different color
+  pairs, so the tracker knows which physical wheel is which without guessing
+  from position: wheels can pass each other without swapping labels.
+- **Occlusion:** if a wheel's dots disappear (hand over the marker, wheel
+  behind the other wheel), the readout shows "markers lost" for ~10 frames,
+  then the wheel drops. When it reappears it is still the same player (colors
+  do not lie), but its angle history and smoothing restart as a fresh entry.
+  A direct head-on overlap of both wheels (physically impossible with real
+  wheels) exceeds the grace period and causes exactly such a restart.
 - All of the above is covered by tests in `tests/run-tests.js` (simulated
   data).
 
