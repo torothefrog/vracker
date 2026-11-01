@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vracker - marker wheel tracking prototype</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: #14161c; color: #e8eaf0; }
+  header { padding: 12px 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  main { display: flex; flex-wrap: wrap; gap: 16px; padding: 0 16px 16px; }
+  .stage { position: relative; }
+  canvas { background: #000; max-width: 100%; border-radius: 8px; display: block; }
+  #simBadge { position: absolute; top: 10px; left: 10px; background: #b45309; color: #fff;
+    padding: 3px 10px; border-radius: 6px; font-weight: 600; font-size: 13px; display: none; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; align-items: center; }
+  button { background: #2b3040; color: #e8eaf0; border: 1px solid #3c4358; border-radius: 6px;
+    padding: 8px 14px; font-size: 14px; cursor: pointer; }
+  button:hover { background: #343b4f; }
+  button.armed { background: #7c3aed; border-color: #8b5cf6; }
+  .swatch { width: 18px; height: 18px; border-radius: 4px; display: inline-block; vertical-align: middle; }
+  #status { color: #9aa3b8; min-height: 1.4em; }
+  .readouts { display: flex; gap: 12px; flex-wrap: wrap; }
+  .wheel { background: #1d212b; border: 1px solid #2c3242; border-radius: 8px; padding: 10px 14px; min-width: 170px; }
+  .wheel h2 { font-size: 15px; margin: 0 0 6px; }
+  .wheel .val { font-family: ui-monospace, monospace; font-size: 14px; }
+  .wheel .lost { color: #f87171; }
+  .notes { max-width: 640px; color: #9aa3b8; font-size: 13px; padding: 0 16px 24px; }
+  a { color: #7dd3fc; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Vracker - marker wheel tracking prototype</h1>
+  <div id="status">Choose a video source. Camera requires HTTPS or localhost and stays on this device.</div>
+</header>
+<main>
+  <div class="stage">
+    <canvas id="view" width="640" height="480"></canvas>
+    <div id="simBadge">SIMULATED FEED - not your camera</div>
+    <div class="controls">
+      <button id="btnCamera">Use camera</button>
+      <button id="btnSim">Simulation</button>
+      <button id="btnCalCenter"><span class="swatch" id="swCenter"></span> sample center color</button>
+      <button id="btnCalPointer"><span class="swatch" id="swPointer"></span> sample pointer color</button>
+      <a href="print-markers.html" target="_blank">printable markers</a>
+    </div>
+    <div class="readouts" id="readouts"></div>
+  </div>
+</main>
+<div class="notes">
+  All video processing runs locally in this page; no frames leave your device.
+  Simulation mode generates synthetic wheels to exercise the same tracking pipeline -
+  it validates the software, not your camera, lighting, or markers.
+</div>
+<video id="cam" playsinline muted style="display:none"></video>
+<script src="src/tracker.js"></script>
+<script src="src/sim.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
