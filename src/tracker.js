@@ -120,8 +120,13 @@
                             // Time-based (not per-frame) so jittery frame
                             // intervals do not spike the velocity estimate.
       posTau: 0.05,         // s; time constant for reported-position smoothing
-      resetGapS: 1.0        // s; after a gap this long (tab hidden, stall),
-                            // re-acquire fresh instead of trusting stale state
+      snapGapS: 0.5,        // s; gaps between this and resetGapS (tab stall,
+                            // slow machine): keep identity, snap to the new
+                            // observation, zero the velocity - rotation across
+                            // the gap is unknowable, so do not integrate it
+      resetGapS: 3.0        // s; after a gap this long, re-acquire fresh
+                            // instead of trusting stale state (more than half
+                            // a turn between frames is unrecoverable anyway)
     };
   }
 
@@ -154,7 +159,8 @@
 
   function step(state, frame, cfg, nowMs) {
     const dtRaw = state.lastTime ? (nowMs - state.lastTime) / 1000 : 0;
-    if (dtRaw > cfg.resetGapS) state.wheels = {}; // long pause: re-acquire fresh
+    if (dtRaw > cfg.resetGapS) state.wheels = {}; // very long pause: fresh start
+    const snap = dtRaw > cfg.snapGapS;            // mid pause: snap, don't integrate
     const dt = Math.min(dtRaw, 0.5);
     state.lastTime = nowMs;
 
@@ -162,7 +168,8 @@
       const obs = observeWheel(def, frame, cfg);
       const wh = state.wheels[def.label];
       if (obs) {
-        if (wh) updateWheel(wh, obs, dt, cfg);
+        if (wh && snap) snapWheel(wh, obs);
+        else if (wh) updateWheel(wh, obs, dt, cfg);
         else state.wheels[def.label] = newWheel(def.label, obs);
       } else if (wh) {
         wh.lost++;
@@ -184,6 +191,20 @@
       center: o.center, pointer: o.pointer,
       seen: 1
     };
+  }
+
+  // After a mid-length stall: keep the wheel (identity is color-bound) and
+  // rebase it on the new observation without integrating the unknowable
+  // rotation across the gap.
+  function snapWheel(wh, o) {
+    wh.angleRaw = o.angle;
+    wh.angVel = 0;
+    wh.x = o.x;
+    wh.y = o.y;
+    wh.center = o.center;
+    wh.pointer = o.pointer;
+    wh.lost = 0;
+    wh.seen++;
   }
 
   function updateWheel(wh, o, dt, cfg) {

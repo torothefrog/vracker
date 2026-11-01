@@ -84,6 +84,12 @@ runs locally in the browser; no frames leave the device.
   do not lie), but its angle history and smoothing restart as a fresh entry.
   A direct head-on overlap of both wheels (physically impossible with real
   wheels) exceeds the grace period and causes exactly such a restart.
+- **Stalls (hidden tab, slow machine):** after a 0.5-3 s frame gap the tracker
+  snaps to the new observation and zeroes the velocity (rotation during the
+  gap is unknowable and is not integrated); velocity re-converges within a
+  few frames. After a gap over 3 s the tracking state resets and wheels are
+  re-acquired fresh. Angle continuity across any gap longer than half a wheel
+  turn is unrecoverable by design.
 - All of the above is covered by tests in `tests/run-tests.js` (simulated
   data).
 

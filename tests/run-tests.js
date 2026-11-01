@@ -253,16 +253,63 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
   const cfg = T.defaultConfig();
   const state = T.createState();
   for (let f = 0; f < 30; f++) T.step(state, sim.draw(f / 30), cfg, 1000 + f * 33);
-  // 3s stall (tab hidden): paths move far; state must reset, not snap
-  T.step(state, sim.draw(4), cfg, 1000 + 30 * 33 + 3000);
-  T.step(state, sim.draw(4.033), cfg, 1000 + 30 * 33 + 3033);
+  // 5s stall (tab hidden): past resetGapS; state must reset, not snap
+  T.step(state, sim.draw(6), cfg, 1000 + 30 * 33 + 5000);
+  T.step(state, sim.draw(6.033), cfg, 1000 + 30 * 33 + 5033);
   check('long pause: both wheels present, no phantoms',
     !!state.wheels.A && !!state.wheels.B && Object.keys(state.wheels).length === 2);
   check('long pause: entries are fresh (seen reset)',
     state.wheels.A.seen <= 3 && state.wheels.B.seen <= 3,
     'A:' + state.wheels.A.seen + ' B:' + state.wheels.B.seen);
   check('long pause: identity still color-bound after reset',
-    state.wheels.A.x < state.wheels.B.x); // at t=4, A's path is left of B's
+    state.wheels.A.x < state.wheels.B.x); // at t=6, A's path is left of B's
+}
+
+// --- mid-length stall: keep identity, snap, velocity re-converges ---
+{
+  const W = 320, H = 240;
+  const sim = S.createSimulator(W, H);
+  const cfg = T.defaultConfig();
+  const state = T.createState();
+  let ms = 1000;
+  for (let f = 0; f < 30; f++) { T.step(state, sim.draw(f / 30), cfg, ms); ms += 33; }
+  const seenBefore = state.wheels.A.seen;
+  const angleBefore = state.wheels.A.angleDeg;
+  ms += 1200; // 1.2s stall: between snapGapS and resetGapS
+  T.step(state, sim.draw((ms - 1000) / 1000), cfg, ms);
+  check('mid stall: wheel kept (no reset)', state.wheels.A.seen === seenBefore + 1,
+    'seen ' + seenBefore + ' -> ' + state.wheels.A.seen);
+  check('mid stall: velocity zeroed, no spike', state.wheels.A.angVel === 0);
+  check('mid stall: no backward angle jump', state.wheels.A.angleDeg >= angleBefore - 1,
+    angleBefore.toFixed(0) + ' -> ' + state.wheels.A.angleDeg.toFixed(0));
+  for (let f = 0; f < 30; f++) { ms += 33; T.step(state, sim.draw((ms - 1000) / 1000), cfg, ms); }
+  check('mid stall: velocity re-converges near +90', near(state.wheels.A.angVel, 90, 25),
+    'v=' + state.wheels.A.angVel.toFixed(0));
+  check('mid stall: still exactly 2 wheels', Object.keys(state.wheels).length === 2);
+}
+
+// --- burst cadence (1s stalls every ~5 frames) stays healthy ---
+// Reproduces the throttled-host pattern observed on a real headless browser:
+// 4-6 frames at 50-100ms, then a ~1.0s stall, repeating.
+{
+  const W = 320, H = 240;
+  const sim = S.createSimulator(W, H);
+  const cfg = T.defaultConfig();
+  const state = T.createState();
+  let ms = 1000;
+  let worstDrop = 0;
+  for (let cycle = 0; cycle < 8; cycle++) {
+    for (let f = 0; f < 5; f++) {
+      ms += 60;
+      T.step(state, sim.draw((ms - 1000) / 1000), cfg, ms);
+    }
+    if (cycle >= 2 && state.wheels.A.angVel < 45) worstDrop++; // end of burst: should be near 90
+    ms += 1000; // stall
+  }
+  check('burst cadence: velocity healthy at end of bursts', worstDrop === 0,
+    worstDrop + ' weak bursts, final v=' + state.wheels.A.angVel.toFixed(0));
+  check('burst cadence: identity kept throughout', !!state.wheels.A && !!state.wheels.B
+    && Object.keys(state.wheels).length === 2);
 }
 
 console.log(failures === 0 ? '\nALL TESTS PASSED (simulated data)' : '\n' + failures + ' FAILURES');
