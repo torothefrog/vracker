@@ -101,7 +101,7 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
   const W = 160, H = 120;
   const sim = S.createSimulator(W, H);
   const cfg = T.defaultConfig();
-  cfg.posSmooth = 0.3;
+  cfg.posTau = 0.09;
   const state = T.createState();
   let raw = [], sm = [];
   for (let f = 0; f < 20; f++) {
@@ -216,6 +216,41 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
   check('short occlusion: same label kept', labelBefore === labelAfter,
     labelBefore + ' -> ' + labelAfter);
   check('short occlusion: loss was flagged while hidden', lostWasFlagged);
+}
+
+// --- jittery frame times do not destabilize velocity ---
+{
+  const W = 320, H = 240;
+  const sim = S.createSimulator(W, H);
+  const cfg = T.defaultConfig();
+  const state = T.createState();
+  let ms = 1000;
+  const dts = [5, 90, 12, 55, 8, 120, 30, 16]; // deliberately irregular
+  for (let f = 0; f <= 80; f++) {
+    ms += dts[f % dts.length];
+    T.step(state, sim.draw((ms - 1000) / 1000), cfg, ms);
+  }
+  const sorted = state.wheels.slice().sort((a, b) => a.x - b.x);
+  const vL = sorted[0].angVel, vR = sorted[1].angVel;
+  check('jittery dt: left velocity near +90', near(vL, 90, 35), 'v=' + vL.toFixed(0));
+  check('jittery dt: right velocity near -45', near(vR, -45, 25), 'v=' + vR.toFixed(0));
+}
+
+// --- long pause re-acquires instead of accumulating phantoms ---
+{
+  const W = 320, H = 240;
+  const sim = S.createSimulator(W, H);
+  const cfg = T.defaultConfig();
+  const state = T.createState();
+  for (let f = 0; f < 30; f++) T.step(state, sim.draw(f / 30), cfg, 1000 + f * 33);
+  const labelsBefore = state.wheels.map(wh => wh.label).sort().join('');
+  // 3s stall (tab hidden): paths move far beyond maxJump
+  T.step(state, sim.draw(4), cfg, 1000 + 30 * 33 + 3000);
+  T.step(state, sim.draw(4.033), cfg, 1000 + 30 * 33 + 3033);
+  check('long pause: still exactly 2 wheels, no phantoms', state.wheels.length === 2,
+    'got ' + state.wheels.length);
+  check('long pause: entries are fresh (seen reset)', state.wheels.every(wh => wh.seen <= 3),
+    state.wheels.map(wh => wh.label + ':' + wh.seen).join(','));
 }
 
 console.log(failures === 0 ? '\nALL TESTS PASSED (simulated data)' : '\n' + failures + ' FAILURES');

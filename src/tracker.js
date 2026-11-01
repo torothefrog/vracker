@@ -112,8 +112,13 @@
       maxLost: 10,          // frames a wheel may go missing before being dropped
       ambiguityDist: 120,   // px; wheels closer than this are flagged ambiguous:
                             // proximity pairing/identity cannot be trusted
-      velSmooth: 0.25,      // EMA factor for angular velocity
-      posSmooth: 0.5        // EMA factor for reported position
+      velTau: 0.12,         // s; time constant for angular-velocity smoothing.
+                            // Time-based (not per-frame) so jittery frame
+                            // intervals do not spike the velocity estimate.
+      posTau: 0.05,         // s; time constant for reported-position smoothing
+      resetGapS: 1.0        // s; after a gap this long (tab hidden, stall),
+                            // drop identity and re-acquire instead of spawning
+                            // phantom wheels from stale positions
     };
   }
 
@@ -123,7 +128,9 @@
 
   function step(state, frame, cfg, nowMs) {
     const w = frame.width, h = frame.height, data = frame.data;
-    const dt = state.lastTime ? Math.min((nowMs - state.lastTime) / 1000, 0.5) : 0;
+    const dtRaw = state.lastTime ? (nowMs - state.lastTime) / 1000 : 0;
+    if (dtRaw > cfg.resetGapS) state.wheels = []; // long pause: re-acquire fresh
+    const dt = Math.min(dtRaw, 0.5);
     state.lastTime = nowMs;
 
     const centerMask = thresholdMask(data, w, h, cfg.centerColor);
@@ -220,10 +227,12 @@
     wh.angleDeg += daDeg;
     if (dt > 0) {
       const inst = daDeg / dt;
-      wh.angVel += cfg.velSmooth * (inst - wh.angVel);
+      const aV = 1 - Math.exp(-dt / cfg.velTau);
+      wh.angVel += aV * (inst - wh.angVel);
     }
-    wh.x += cfg.posSmooth * (o.x - wh.x);
-    wh.y += cfg.posSmooth * (o.y - wh.y);
+    const aP = dt > 0 ? 1 - Math.exp(-dt / cfg.posTau) : 1;
+    wh.x += aP * (o.x - wh.x);
+    wh.y += aP * (o.y - wh.y);
     wh.center = o.center;
     wh.pointer = o.pointer;
     wh.ambiguous = !!o.ambiguous;
