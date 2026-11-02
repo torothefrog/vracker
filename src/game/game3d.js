@@ -368,6 +368,7 @@ import * as THREE from 'three';
   const wheels = window.VrWheelInput.create({
     video: document.getElementById('cam'),
     preview,
+    markerEl: document.getElementById('markers'),
     onStatus: setStatus
   });
   // Read-only diagnostic handle (used by live checks; handy for tinkering).

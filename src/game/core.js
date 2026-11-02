@@ -85,6 +85,13 @@
     return Math.max(-1, Math.min(1, d));
   }
 
+  // The webcam faces the player, so turning the physical wheel to the player's
+  // right (clockwise for them) is counter-clockwise in the image: the tracked
+  // image angle FALLS. Steering from tracker angles therefore inverts.
+  function steerFromImageAngle(angleDeg, baselineDeg, fullTurnDeg) {
+    return steerFromWheel(baselineDeg, angleDeg, fullTurnDeg);
+  }
+
   function spawnAsteroid(state, x, y, r) {
     const cfg = state.cfg, rng = state.rng;
     state.asteroids.push({
@@ -226,5 +233,5 @@
     };
   }
 
-  return { DEFAULTS, createGame, restart, step, steerFromWheel, seededRng };
+  return { DEFAULTS, createGame, restart, step, steerFromWheel, steerFromImageAngle, seededRng };
 });

@@ -146,5 +146,37 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
   check('dodged asteroid awards score', g.score - s0 > g.cfg.dodgeScore, 'd=' + (g.score - s0).toFixed(1));
 }
 
+
+// --- tracker angle -> steering, both wheels, through the +/-180 wraparound ---
+{
+  const T = require('../src/tracker.js');
+  const S = require('../src/sim.js');
+  const cfg = T.defaultConfig();
+  for (const idx of [0, 1]) {
+    for (const dir of [-1, 1]) {   // -1: image angle falls (player turns right)
+      const W = 320, H = 240;
+      const truth = t => [0, 1].map(i => ({
+        cx: W * (i ? 0.73 : 0.27), cy: H * 0.5,
+        angle: i === idx ? dir * (Math.PI * 0.8 + t * 1.2) : 0,
+        wheelR: 46, cDotR: 9, pDotR: 9, ptrR: 30 }));
+      const sim = S.createSimulator(W, H, truth);
+      const st = T.createState();
+      let base = null, last = null;
+      for (let f = 0; f < 60; f++) {
+        const out = T.step(st, sim.draw(f / 30), cfg, 1000 + f * 33);
+        const wh = out.wheels.find(w => w.label === (idx ? 'B' : 'A'));
+        if (!wh) continue;
+        if (base === null) base = wh.angleDeg;
+        last = wh.angleDeg;
+      }
+      const steer = G.steerFromImageAngle(last, base);
+      const expect = dir === -1 ? 1 : -1;
+      check('wheel ' + (idx ? 'B' : 'A') + ' image angle ' + (dir < 0 ? 'falling' : 'rising') +
+        ' through +/-180 steers ' + (expect > 0 ? 'right' : 'left'),
+        steer * expect > 0.5, 'steer=' + steer.toFixed(2) + ' travelled=' + (last - base).toFixed(0));
+    }
+  }
+}
+
 console.log(failures === 0 ? '\nALL GAME TESTS PASSED' : '\n' + failures + ' FAILURES');
 process.exit(failures === 0 ? 0 : 1);

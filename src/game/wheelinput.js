@@ -15,6 +15,7 @@
     const video = opts.video;                 // hidden <video>
     const preview = opts.preview;             // small visible preview canvas
     const pctx = preview.getContext('2d');
+    const markerEl = opts.markerEl || null;
     const onStatus = opts.onStatus || function () {};
     const cfg = T.defaultConfig();
     // Pick up per-wheel colors calibrated on the tracker page (same device).
@@ -37,10 +38,10 @@
     // Per-marker detection counts for the preview (refreshed ~5x/s) so a
     // marker that is not found is visible instead of silently missing.
     const MARKERS = [
-      { key: 'A centre', wheel: 'A', part: 'center', css: 'hsl(140,70%,50%)' },
-      { key: 'A pointer', wheel: 'A', part: 'pointer', css: 'hsl(300,70%,55%)' },
-      { key: 'B centre', wheel: 'B', part: 'center', css: 'hsl(190,80%,55%)' },
-      { key: 'B pointer', wheel: 'B', part: 'pointer', css: 'hsl(60,85%,55%)' }
+      { key: 'A centre', name: 'GREEN', wheel: 'A', part: 'center', css: 'hsl(140,70%,50%)' },
+      { key: 'A pointer', name: 'MAGENTA', wheel: 'A', part: 'pointer', css: 'hsl(300,70%,55%)' },
+      { key: 'B centre', name: 'CYAN', wheel: 'B', part: 'center', css: 'hsl(190,80%,55%)' },
+      { key: 'B pointer', name: 'YELLOW', wheel: 'B', part: 'pointer', css: 'hsl(60,85%,55%)' }
     ];
     let diagN = 0;
     const diag = {};
@@ -53,6 +54,7 @@
         video.srcObject = stream;
         await video.play();
         preview.style.display = 'block';
+        if (markerEl) markerEl.style.display = 'block';
         onStatus('Camera live. Hold the wheels level, then press RECENTER or start.');
         return true;
       } catch (err) {
@@ -66,6 +68,7 @@
       if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
       video.srcObject = null;
       preview.style.display = 'none';
+      if (markerEl) markerEl.style.display = 'none';
     }
 
     // Capture the current wheel angles as the neutral position. Wheels that
@@ -123,16 +126,14 @@
         pctx.font = '13px ui-monospace, monospace';
         pctx.fillText(wh.label, wh.x + 12, wh.y - 8);
       }
-      // Marker checklist: filled square = found, X = not found.
-      pctx.font = '14px ui-monospace, monospace';
-      MARKERS.forEach((m, i) => {
-        const n = diag[m.key] || 0;
-        const y = 8 + i * 18;
-        pctx.fillStyle = 'rgba(0,0,0,0.55)'; pctx.fillRect(6, y - 2, 118, 17);
-        pctx.fillStyle = m.css; pctx.fillRect(10, y + 1, 10, 10);
-        pctx.fillStyle = n ? '#e5e7eb' : '#fb7185';
-        pctx.fillText(m.key + (n ? ' ok' : ' X'), 26, y + 11);
-      });
+      // Marker checklist (HTML, so it stays readable at any preview size).
+      if (markerEl && diagN % 12 === 1) {
+        markerEl.innerHTML = MARKERS.map(m => {
+          const n = diag[m.key] || 0;
+          return '<div class="mk' + (n ? '' : ' miss') + '"><i style="background:' + m.css +
+            '"></i>' + m.key + ' (' + m.name + ') ' + (n ? 'OK' : 'NOT FOUND') + '</div>';
+        }).join('');
+      }
     }
 
     // Normalized steering for one ship, or null when its wheel is not tracked.
@@ -143,7 +144,7 @@
       // Camera faces the player, so a physical clockwise turn shows as
       // counter-clockwise (falling angle) in the image: invert so turning
       // the wheel right steers right.
-      return G.steerFromWheel(baselines[label], wh.angleDeg);
+      return G.steerFromImageAngle(wh.angleDeg, baselines[label]);
     }
 
     function wheelSeen(label) { return !!latest[label]; }
