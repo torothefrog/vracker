@@ -34,6 +34,16 @@
     let stream = null;
     const baselines = { A: null, B: null };
     const latest = { A: null, B: null };      // last tracker output per label
+    // Per-marker detection counts for the preview (refreshed ~5x/s) so a
+    // marker that is not found is visible instead of silently missing.
+    const MARKERS = [
+      { key: 'A centre', wheel: 'A', part: 'center', css: 'hsl(140,70%,50%)' },
+      { key: 'A pointer', wheel: 'A', part: 'pointer', css: 'hsl(300,70%,55%)' },
+      { key: 'B centre', wheel: 'B', part: 'center', css: 'hsl(190,80%,55%)' },
+      { key: 'B pointer', wheel: 'B', part: 'pointer', css: 'hsl(60,85%,55%)' }
+    ];
+    let diagN = 0;
+    const diag = {};
 
     async function start() {
       try {
@@ -89,6 +99,12 @@
         present[label] = now;
       }
 
+      if (diagN++ % 12 === 0) {
+        for (const m of MARKERS) {
+          const def = cfg.wheels.find(d => d.label === m.wheel)[m.part];
+          diag[m.key] = T.findBlobs(T.thresholdMask(frame.data, w, h, def), w, h, cfg.minArea).length;
+        }
+      }
       // Preview: mirrored-ish raw feed + per-wheel overlay, like the tracker page.
       if (preview.width !== w || preview.height !== h) { preview.width = w; preview.height = h; }
       pctx.putImageData(frame, 0, 0);
@@ -107,6 +123,16 @@
         pctx.font = '13px ui-monospace, monospace';
         pctx.fillText(wh.label, wh.x + 12, wh.y - 8);
       }
+      // Marker checklist: filled square = found, X = not found.
+      pctx.font = '14px ui-monospace, monospace';
+      MARKERS.forEach((m, i) => {
+        const n = diag[m.key] || 0;
+        const y = 8 + i * 18;
+        pctx.fillStyle = 'rgba(0,0,0,0.55)'; pctx.fillRect(6, y - 2, 118, 17);
+        pctx.fillStyle = m.css; pctx.fillRect(10, y + 1, 10, 10);
+        pctx.fillStyle = n ? '#e5e7eb' : '#fb7185';
+        pctx.fillText(m.key + (n ? ' ok' : ' X'), 26, y + 11);
+      });
     }
 
     // Normalized steering for one ship, or null when its wheel is not tracked.
@@ -114,7 +140,10 @@
       const wh = latest[label];
       if (!wh) return null;
       if (baselines[label] === null) baselines[label] = wh.angleDeg; // first sight = neutral
-      return G.steerFromWheel(wh.angleDeg, baselines[label]);
+      // Camera faces the player, so a physical clockwise turn shows as
+      // counter-clockwise (falling angle) in the image: invert so turning
+      // the wheel right steers right.
+      return G.steerFromWheel(baselines[label], wh.angleDeg);
     }
 
     function wheelSeen(label) { return !!latest[label]; }

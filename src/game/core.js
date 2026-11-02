@@ -27,10 +27,10 @@
     maxSpeedBonus: 16,
     spawnZ: -95,
     despawnZ: 12,
-    spawnInt0: 1.25,     // s between asteroid spawns at t=0
-    spawnIntMin: 0.5,
-    spawnRamp: 0.011,    // spawn interval shrink per second alive
-    pairChance: 0.28,    // chance an asteroid spawn is a pair with a gap
+    spawnInt0: 2.6,      // s between asteroid spawns at t=0
+    spawnIntMin: 0.9,
+    spawnRamp: 0.012,    // spawn interval shrink per second alive
+    pairChance: 0.18,    // chance an asteroid spawn is a pair with a gap
     pairGap: 3.4,        // guaranteed clear lane between a pair
     astRMin: 0.75,
     astRMax: 1.7,
@@ -60,7 +60,7 @@
       ],
       asteroids: [], stars: [], particles: [],
       nextId: 1,
-      spawnTimer: 1.2, starTimer: cfg.starEveryS,
+      spawnTimer: 2.4, starTimer: cfg.starEveryS,
       events: []           // consumed by renderer/audio each frame
     };
     return state;
@@ -74,7 +74,7 @@
     for (const s of state.ships) { s.vx = 0; s.inv = 0; s.steer = 0; }
     state.asteroids.length = 0;
     state.stars.length = 0;
-    state.spawnTimer = 1.2; state.starTimer = state.cfg.starEveryS;
+    state.spawnTimer = 2.4; state.starTimer = state.cfg.starEveryS;
   }
 
   // Wheel angle (continuous degrees) -> normalized steering. The baseline is

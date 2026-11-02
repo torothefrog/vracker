@@ -421,6 +421,56 @@ import * as THREE from 'three';
   let testTime = 0, testHits = 0, testCollects = 0, testDone = false;
   let maxAsteroidsSeen = 0;
 
+
+  // ---------- Lane guide: edge rails + asteroid path stripes ----------
+  // Rails mark exactly how far the ships can go (ship center clamps at
+  // laneW; the hull reaches ~1.2 further). Each asteroid casts a floor
+  // stripe from itself to the ship line, as wide as its hit zone, so you can
+  // see whether your ship is in its path. Stripes turn red when a ship is in
+  // the path and the asteroid is close.
+  const FLOOR_Y = -1.25;
+  const railX = game.cfg.laneW + 1.25;
+  const railMat = new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.75 });
+  for (const sx of [-1, 1]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 110), railMat);
+    rail.position.set(sx * railX, FLOOR_Y, -45);
+    scene.add(rail);
+  }
+  const gate = new THREE.Mesh(new THREE.BoxGeometry(railX * 2, 0.06, 0.12),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 }));
+  gate.position.set(0, FLOOR_Y, game.cfg.shipZ);
+  scene.add(gate);
+  const stripeGeo = new THREE.PlaneGeometry(1, 1);
+  stripeGeo.rotateX(-Math.PI / 2);
+  const stripes = new Map(); // asteroid id -> mesh
+  function syncStripes() {
+    const live = new Set();
+    for (const a of game.asteroids) {
+      if (a.z > game.cfg.shipZ + 1) continue;
+      live.add(a.id);
+      let m = stripes.get(a.id);
+      if (!m) {
+        m = new THREE.Mesh(stripeGeo, new THREE.MeshBasicMaterial({
+          color: 0xffb454, transparent: true, opacity: 0.09, depthWrite: false }));
+        scene.add(m); stripes.set(a.id, m);
+      }
+      const w = (a.r + game.cfg.shipR) * 1.8 * 0.9;
+      const len = Math.max(0.1, game.cfg.shipZ - a.z);
+      m.scale.set(w, 1, len);
+      m.position.set(a.x, FLOOR_Y + 0.01, a.z + len / 2);
+      let danger = false;
+      for (const sh of game.ships) {
+        if (Math.abs(sh.x - a.x) < (a.r + game.cfg.shipR) * 0.9) danger = true;
+      }
+      const near = a.z > -45;
+      m.material.color.setHex(danger && near ? 0xff5c5c : 0xffb454);
+      m.material.opacity = danger && near ? 0.32 : 0.09;
+    }
+    for (const [id, m] of stripes) {
+      if (!live.has(id)) { scene.remove(m); m.material.dispose(); stripes.delete(id); }
+    }
+  }
+
   function syncMeshes() {
     const seenAst = new Set(), seenStar = new Set();
     for (const a of game.asteroids) {
@@ -442,6 +492,7 @@ import * as THREE from 'three';
       if (!seenStar.has(id)) { scene.remove(m); starMeshes.delete(id); }
     }
     maxAsteroidsSeen = Math.max(maxAsteroidsSeen, game.asteroids.length);
+    syncStripes();
 
     for (let i = 0; i < 2; i++) {
       const s = game.ships[i], m = shipMeshes[i];

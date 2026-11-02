@@ -128,6 +128,13 @@ long enough to be dropped (hand over the markers, wheel out of frame), the
 ship just holds course while it is gone, and when the wheel comes back its
 position re-anchors as neutral - no steering jump.
 
+**Nov 2 feedback round.** Fewer asteroids at the start (spawn interval 2.6 s
+ramping down to 0.9 s, fewer pairs); blue lane rails show the steering limit
+and each asteroid casts a floor stripe (turns red when a ship is in its path);
+wheel steering inverted (the camera faces the player, so a clockwise turn is
+counter-clockwise in the image); the camera preview lists which of the four
+markers (A centre/pointer, B centre/pointer) are detected.
+
 ## Roadmap
 
 1. ~~This milestone~~: two-wheel marker tracking, position + angle readouts. **Done.**
