@@ -347,9 +347,11 @@ import * as THREE from 'three';
   let best = Number(localStorage.getItem('vracker-best') || 0);
   hudBest.textContent = 'best ' + best;
 
-  function setMode(n) {
+  function setMode(n, save) {
     players = n === 1 ? 1 : 2;
-    localStorage.setItem('vracker-players', String(players));
+    // Only a real mode choice is saved; the initial call (and the ?players=
+    // URL override used by the test harness) must not overwrite it.
+    if (save !== false) localStorage.setItem('vracker-players', String(players));
     game = G.createGame({ players });
     window.__vracker.game = game;
     shipMeshes[1].visible = players === 2;
@@ -446,7 +448,7 @@ import * as THREE from 'three';
     overOverlay.style.display = 'none';
     startOverlay.style.display = 'flex';
   });
-  setMode(players);
+  setMode(players, false);
 
   // ---------- HUD ----------
   function drawHearts() {
