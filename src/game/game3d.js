@@ -25,8 +25,10 @@ import * as THREE from 'three';
   const overBest = document.getElementById('overBest');
   const statusEl = document.getElementById('status');
   const preview = document.getElementById('preview');
-  const btnStart = document.getElementById('btnStart');
+  const btnStart1 = document.getElementById('btnStart1');
+  const btnStart2 = document.getElementById('btnStart2');
   const btnRestart = document.getElementById('btnRestart');
+  const btnMenu = document.getElementById('btnMenu');
   const btnCamera = document.getElementById('btnCamera');
   const btnCamera2 = document.getElementById('btnCamera2');
   const btnRecenter = document.getElementById('btnRecenter');
@@ -243,8 +245,8 @@ import * as THREE from 'three';
     return g;
   }
   shipMeshes.push(
-    buildShip(0x35d07f, 0x1e7a4c),   // player A: green (matches wheel A)
-    buildShip(0x41b8f5, 0x1f6fa8)    // player B: blue (matches wheel B)
+    buildShip(0x35d07f, 0x1e7a4c),   // player A: green (matches wheel A); the solo ship
+    buildShip(0x41b8f5, 0x1f6fa8)    // player B: blue (matches wheel B); hidden in solo
   );
   fitCamera();                       // apply initial ship scale
 
@@ -338,9 +340,22 @@ import * as THREE from 'three';
   }
 
   // ---------- Game state + inputs ----------
-  const game = G.createGame({});
+  // Player mode: 1 (solo, one ship) or 2 (co-op pair). Saved in the browser;
+  // the ?players=1 URL parameter wins so the test harness can force a mode.
+  let players = (params.get('players') || localStorage.getItem('vracker-players')) === '1' ? 1 : 2;
+  let game = G.createGame({ players });
   let best = Number(localStorage.getItem('vracker-best') || 0);
   hudBest.textContent = 'best ' + best;
+
+  function setMode(n) {
+    players = n === 1 ? 1 : 2;
+    localStorage.setItem('vracker-players', String(players));
+    game = G.createGame({ players });
+    window.__vracker.game = game;
+    shipMeshes[1].visible = players === 2;
+    btnStart1.classList.toggle('sel', players === 1);
+    btnStart2.classList.toggle('sel', players === 2);
+  }
 
   const keys = new Set();
   window.addEventListener('keydown', (e) => {
@@ -353,7 +368,7 @@ import * as THREE from 'three';
   // Touch: left half steers ship A, right half ship B, by drag distance.
   const touches = new Map(); // pointerId -> {ship, x0, steer}
   canvas.addEventListener('pointerdown', (e) => {
-    const ship = e.clientX < window.innerWidth / 2 ? 0 : 1;
+    const ship = players === 1 ? 0 : (e.clientX < window.innerWidth / 2 ? 0 : 1);
     touches.set(e.pointerId, { ship, x0: e.clientX, steer: 0 });
     try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
   });
@@ -372,7 +387,7 @@ import * as THREE from 'three';
     onStatus: setStatus
   });
   // Read-only diagnostic handle (used by live checks; handy for tinkering).
-  window.__vracker = { game, version: '2.1.0', wheels };
+  window.__vracker = { game, version: '2.2.0', wheels };
 
   btnCamera.addEventListener('click', async () => { ensureAudio(); await wheels.start(); });
   btnCamera2.addEventListener('click', async () => { ensureAudio(); await wheels.start(); });
@@ -394,6 +409,19 @@ import * as THREE from 'three';
     if (k !== 0) return k;
     return touchSteer(ship);
   }
+  // Solo: whichever wheel is seen steers (A preferred), A/D and arrow keys
+  // both work, and a drag anywhere on the screen steers.
+  function inputSolo() {
+    const wa = wheels.getSteer('A');
+    if (wa !== null) return wa;
+    const wb = wheels.getSteer('B');
+    if (wb !== null) return wb;
+    const k = ((keys.has('KeyD') || keys.has('ArrowRight')) ? 1 : 0) -
+              ((keys.has('KeyA') || keys.has('ArrowLeft')) ? 1 : 0);
+    if (k !== 0) return k;
+    for (const t of touches.values()) return t.steer;
+    return 0;
+  }
 
   function startGame() {
     ensureAudio();
@@ -404,11 +432,21 @@ import * as THREE from 'three';
     shake = 0;
     sfx.start();
     setStatus(wheels.active()
-      ? 'Steer with the wheels. Turn right to move right; back to center = straight.'
-      : 'Ship A: A/D keys. Ship B: left/right arrows. Or drag on the left/right half of the screen.');
+      ? (players === 1
+        ? 'Steer with the wheel. Turn right to move right; back to center = straight.'
+        : 'Steer with the wheels. Turn right to move right; back to center = straight.')
+      : (players === 1
+        ? 'Steer with A/D or the arrow keys, or drag anywhere on the screen.'
+        : 'Ship A: A/D keys. Ship B: left/right arrows. Or drag on the left/right half of the screen.'));
   }
-  btnStart.addEventListener('click', startGame);
+  btnStart1.addEventListener('click', () => { setMode(1); startGame(); });
+  btnStart2.addEventListener('click', () => { setMode(2); startGame(); });
   btnRestart.addEventListener('click', startGame);
+  btnMenu.addEventListener('click', () => {
+    overOverlay.style.display = 'none';
+    startOverlay.style.display = 'flex';
+  });
+  setMode(players);
 
   // ---------- HUD ----------
   function drawHearts() {
@@ -495,7 +533,7 @@ import * as THREE from 'three';
     maxAsteroidsSeen = Math.max(maxAsteroidsSeen, game.asteroids.length);
     syncStripes();
 
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < game.ships.length; i++) {
       const s = game.ships[i], m = shipMeshes[i];
       m.position.set(s.x, game.cfg.shipY, game.cfg.shipZ);
       m.rotation.z = -s.vx * 0.045;                    // bank into the turn
@@ -543,7 +581,7 @@ import * as THREE from 'three';
         while (testTime < TEST_SECONDS && !game.gameOver) {
           testTime += 1 / 60;
           const sa = Math.sin(testTime * 0.9), sb = Math.cos(testTime * 0.7) * 0.8;
-          G.step(game, 1 / 60, sa, sb);
+          G.step(game, 1 / 60, sa, game.ships.length > 1 ? sb : 0);
           for (const ev of game.events) {
             if (ev.type === 'hit') testHits++;
             if (ev.type === 'collect') testCollects++;
@@ -553,6 +591,7 @@ import * as THREE from 'three';
         testDone = true;
         const report = {
           ok: true,
+          players: game.ships.length,
           seconds: Math.round(testTime * 10) / 10,
           score: Math.floor(game.score),
           hearts: game.hearts,
@@ -562,11 +601,13 @@ import * as THREE from 'three';
           asteroidsLive: game.asteroids.length,
           maxAsteroidsSeen,
           shipAx: Math.round(game.ships[0].x * 100) / 100,
-          shipBx: Math.round(game.ships[1].x * 100) / 100
+          shipBx: game.ships.length > 1 ? Math.round(game.ships[1].x * 100) / 100 : null
         };
         testLog.textContent = 'VRTEST ' + JSON.stringify(report);
         document.title = 'TESTDONE';
       }
+    } else if (game.ships.length === 1) {
+      G.step(game, dt, inputSolo(), 0);
     } else {
       G.step(game, dt, inputFor(0), inputFor(1));
     }
@@ -590,7 +631,9 @@ import * as THREE from 'three';
     // (camera pulled back) the view pans with the ships' midpoint so both
     // players stay in frame even when both steer the same way.
     const baseY = 4.6 + (camera.position.z - 9.5) * 0.3;
-    const midX = (game.ships[0].x + game.ships[1].x) / 2;
+    const midX = game.ships.length === 1
+      ? game.ships[0].x
+      : (game.ships[0].x + game.ships[1].x) / 2;
     const baseX = camera.position.z > 13 ? Math.max(-3.2, Math.min(3.2, midX * 0.55)) : 0;
     if (shake > 0) {
       shake = Math.max(0, shake - dt * 1.8);

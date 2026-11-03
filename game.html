@@ -58,6 +58,7 @@
     background: linear-gradient(180deg, #3f9dff, #2b6fd6); border-color: #7cc0ff;
     font-weight: 700; }
   .overlay .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .overlay button.sel { border-color: #ffd23f; box-shadow: inset 0 0 0 1px #ffd23f; }
   .score-line { font-size: 24px; font-weight: 700; }
   .hint { font-size: 13px; color: #b3a6dd; }
   a { color: #7dd3fc; }
@@ -89,30 +90,35 @@
 
 <div class="overlay" id="startOverlay">
   <h1>SPACE DODGERS</h1>
-  <p>Two ships, one screen, endless asteroids. Dodge the rocks, catch the stars,
+  <p>One screen, endless asteroids. Dodge the rocks, catch the stars,
     and keep your five hearts as long as you can.</p>
-  <p><b style="color:#35d07f">Ship A</b> turns with the green wheel (or A/D keys, or drag the left half).
-     <b style="color:#41b8f5">Ship B</b> turns with the blue wheel (or ←/→ keys, or drag the right half).</p>
+  <p><b>1 PLAYER</b> - one ship: any wheel, A/D or arrow keys, or drag anywhere.<br>
+     <b>2 PLAYERS</b> - <b style="color:#35d07f">Ship A</b> turns with the green wheel (or A/D keys, or drag
+     the left half), <b style="color:#41b8f5">Ship B</b> with the blue wheel (or arrow keys, or the right half).</p>
   <div class="row">
-    <button class="big" id="btnStart">START</button>
+    <button class="big" id="btnStart1">1 PLAYER</button>
+    <button class="big" id="btnStart2">2 PLAYERS</button>
     <button id="btnCamera">use wheel camera</button>
   </div>
-  <p class="hint">Camera stays on this device - nothing is uploaded. Hold both wheels level and
-    press START (or "recenter wheels") so straight ahead is straight ahead.</p>
+  <p class="hint">Camera stays on this device - nothing is uploaded. Hold the wheels level and
+    pick a mode (or press "recenter wheels") so straight ahead is straight ahead.</p>
 </div>
 
 <div class="overlay" id="overOverlay" style="display:none">
   <h1>GAME OVER</h1>
   <div class="score-line" id="overScore"></div>
   <div id="overBest" class="hint"></div>
-  <button class="big" id="btnRestart">PLAY AGAIN</button>
+  <div class="row">
+    <button class="big" id="btnRestart">PLAY AGAIN</button>
+    <button id="btnMenu">change mode</button>
+  </div>
   <p class="hint">Enter / Space also restarts.</p>
 </div>
 
 <script src="src/tracker.js?v=2"></script>
-<script src="src/game/core.js?v=4"></script>
+<script src="src/game/core.js?v=5"></script>
 <script src="src/game/wheelinput.js?v=4"></script>
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
-<script type="module" src="src/game/game3d.js?v=7"></script>
+<script type="module" src="src/game/game3d.js?v=8"></script>
 </body>
 </html>

@@ -128,6 +128,12 @@ long enough to be dropped (hand over the markers, wheel out of frame), the
 ship just holds course while it is gone, and when the wheel comes back its
 position re-anchors as neutral - no steering jump.
 
+**Nov 3: solo mode.** The start screen offers **1 PLAYER** or **2 PLAYERS**
+(the choice is remembered in the browser). Solo flies one ship from lane
+center: any visible wheel steers it (green preferred), A/D and the arrow keys
+both work, and a drag anywhere on the screen steers - handy for testing and
+for one kid playing alone. Two-player is unchanged.
+
 **Nov 2 feedback round.** Fewer asteroids at the start (spawn interval 2.6 s
 ramping down to 0.9 s, fewer pairs); blue lane rails show the steering limit
 and each asteroid casts a floor stripe (turns red when a ship is in its path);

@@ -178,5 +178,40 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
   }
 }
 
+// --- solo (one-player) mode ---
+{
+  const g = G.createGame({ rng: G.seededRng(7), players: 1 });
+  check('solo: exactly one ship', g.ships.length === 1, 'ships=' + g.ships.length);
+  G.restart(g);
+  check('solo: ship starts at lane center', g.ships[0].x === 0, 'x=' + g.ships[0].x);
+  for (let i = 0; i < 60; i++) G.step(g, 1 / 60, 1); // full right, 1s
+  check('solo: ship moves right under positive steer', g.ships[0].x > 0,
+    'x=' + g.ships[0].x.toFixed(2));
+  for (let i = 0; i < 600; i++) G.step(g, 1 / 60, 1);
+  check('solo: ship clamps at right lane edge', near(g.ships[0].x, g.cfg.laneW, 0.01),
+    'x=' + g.ships[0].x.toFixed(2));
+  // a collision still costs a shared heart and grants invulnerability
+  g.asteroids.push({ id: 950, x: g.ships[0].x, y: 0, z: -1, r: 1.2, vz: g.speed,
+    rx: 0, ry: 0, wx: 0, wy: 0, color: 0, counted: false });
+  const h0 = g.hearts;
+  G.step(g, 1 / 60, 0);
+  check('solo: collision costs a heart', g.hearts === h0 - 1, 'hearts=' + g.hearts);
+  check('solo: hit event names ship A', g.events.some(e => e.type === 'hit' && e.ship === 'A'));
+  // a star is still collectible
+  g.stars.push({ id: 951, x: g.ships[0].x, y: 0, z: -0.5, vz: g.speed, spin: 0 });
+  const sc0 = g.score;
+  G.step(g, 1 / 60, 0);
+  check('solo: star collected by the one ship', !g.stars.some(st => st.id === 951)
+    && g.score - sc0 >= g.cfg.starScore, 'd=' + (g.score - sc0).toFixed(1));
+  G.restart(g);
+  check('solo: restart keeps one centered ship', g.ships.length === 1 && g.ships[0].x === 0);
+}
+
+// --- default stays two-player ---
+{
+  const g = G.createGame({ rng: G.seededRng(8) });
+  check('default mode is two ships', g.ships.length === 2 && g.players === 2);
+}
+
 console.log(failures === 0 ? '\nALL GAME TESTS PASSED' : '\n' + failures + ' FAILURES');
 process.exit(failures === 0 ? 0 : 1);

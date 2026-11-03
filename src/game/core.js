@@ -49,15 +49,20 @@
   function createGame(opts) {
     const cfg = Object.assign({}, DEFAULTS, (opts && opts.cfg) || {});
     const rng = (opts && opts.rng) || Math.random;
+    // One-player mode: a single ship (label A) starts centered; two-player
+    // keeps the classic side-by-side pair.
+    const players = (opts && opts.players) === 1 ? 1 : 2;
     const state = {
-      cfg, rng,
+      cfg, rng, players,
       time: 0, score: 0, hearts: cfg.startHearts,
       gameOver: false, started: false,
       speed: cfg.baseSpeed,
-      ships: [
-        { label: 'A', x: -2.4, vx: 0, inv: 0, steer: 0 },
-        { label: 'B', x: 2.4, vx: 0, inv: 0, steer: 0 }
-      ],
+      ships: players === 1
+        ? [{ label: 'A', x: 0, vx: 0, inv: 0, steer: 0 }]
+        : [
+            { label: 'A', x: -2.4, vx: 0, inv: 0, steer: 0 },
+            { label: 'B', x: 2.4, vx: 0, inv: 0, steer: 0 }
+          ],
       asteroids: [], stars: [], particles: [],
       nextId: 1,
       spawnTimer: 2.4, starTimer: cfg.starEveryS,
@@ -70,7 +75,8 @@
     state.time = 0; state.score = 0; state.hearts = state.cfg.startHearts;
     state.gameOver = false; state.started = true;
     state.speed = state.cfg.baseSpeed;
-    state.ships[0].x = -2.4; state.ships[1].x = 2.4;
+    if (state.ships.length === 1) state.ships[0].x = 0;
+    else { state.ships[0].x = -2.4; state.ships[1].x = 2.4; }
     for (const s of state.ships) { s.vx = 0; s.inv = 0; s.steer = 0; }
     state.asteroids.length = 0;
     state.stars.length = 0;
@@ -141,7 +147,7 @@
 
     // Ships: lateral velocity follows steering with a short lag, clamp to lane.
     const steers = [steerA, steerB];
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < state.ships.length; i++) {
       const s = state.ships[i];
       s.steer = Math.max(-1, Math.min(1, steers[i] || 0));
       const targetV = s.steer * cfg.shipMaxV;
@@ -152,17 +158,19 @@
       if (s.inv > 0) s.inv -= dt;
     }
 
-    // Ship-ship separation: the two rockets never overlap visually. Steering
-    // still applies; positions are re-balanced around the midpoint only when
-    // the ships would intrude into each other.
-    const minGap = cfg.shipGap;
-    let a = state.ships[0].x, b = state.ships[1].x;
-    if (Math.abs(b - a) < minGap) {
-      const m = (a + b) / 2;
-      a = m - minGap / 2; b = m + minGap / 2;
-      if (a < -cfg.laneW) { a = -cfg.laneW; b = a + minGap; }
-      if (b > cfg.laneW) { b = cfg.laneW; a = b - minGap; }
-      state.ships[0].x = a; state.ships[1].x = b;
+    // Ship-ship separation (two-player only): the two rockets never overlap
+    // visually. Steering still applies; positions are re-balanced around the
+    // midpoint only when the ships would intrude into each other.
+    if (state.ships.length === 2) {
+      const minGap = cfg.shipGap;
+      let a = state.ships[0].x, b = state.ships[1].x;
+      if (Math.abs(b - a) < minGap) {
+        const m = (a + b) / 2;
+        a = m - minGap / 2; b = m + minGap / 2;
+        if (a < -cfg.laneW) { a = -cfg.laneW; b = a + minGap; }
+        if (b > cfg.laneW) { b = cfg.laneW; a = b - minGap; }
+        state.ships[0].x = a; state.ships[1].x = b;
+      }
     }
 
     // Spawning ramps up over time.
