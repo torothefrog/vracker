@@ -59,6 +59,8 @@
     font-weight: 700; }
   .overlay .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
   .overlay button.sel { border-color: #ffd23f; box-shadow: inset 0 0 0 1px #ffd23f; }
+  .camsel { background: rgba(43,48,64,0.85); color: #fff; border: 1px solid #4c5470;
+    border-radius: 8px; padding: 7px 8px; font-size: 13px; max-width: 220px; }
   .score-line { font-size: 24px; font-weight: 700; }
   .hint { font-size: 13px; color: #b3a6dd; }
   a { color: #7dd3fc; }
@@ -76,6 +78,7 @@
 </div>
 
 <div class="topbar">
+  <select id="camSelectTop" class="camsel" title="Choose camera" aria-label="Choose camera" style="display:none"></select>
   <button id="btnCamera2">wheel camera</button>
   <button id="btnRecenter">recenter wheels</button>
   <button id="btnMute">sound: on</button>
@@ -100,6 +103,7 @@
     <button class="big" id="btnStart2">2 PLAYERS</button>
     <button id="btnCamera">use wheel camera</button>
   </div>
+  <div class="row"><select id="camSelectStart" class="camsel" title="Choose camera" aria-label="Choose camera" style="display:none"></select></div>
   <p class="hint">Camera stays on this device - nothing is uploaded. Hold the wheels level and
     pick a mode (or press "recenter wheels") so straight ahead is straight ahead.</p>
 </div>
@@ -116,9 +120,10 @@
 </div>
 
 <script src="src/tracker.js?v=2"></script>
+<script src="src/camera.js?v=1"></script>
 <script src="src/game/core.js?v=5"></script>
-<script src="src/game/wheelinput.js?v=4"></script>
+<script src="src/game/wheelinput.js?v=5"></script>
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
-<script type="module" src="src/game/game3d.js?v=9"></script>
+<script type="module" src="src/game/game3d.js?v=10"></script>
 </body>
 </html>

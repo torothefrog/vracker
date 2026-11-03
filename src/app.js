@@ -58,21 +58,32 @@
 
   function setStatus(msg) { statusEl.textContent = msg; }
 
-  btnCamera.addEventListener('click', async () => {
+  const camSel = document.getElementById('camSelect');
+  async function startCamera(deviceId) {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false
-      });
-      video.srcObject = stream;
+      if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+      const res = await window.VrCamera.open(deviceId);
+      const used = window.VrCamera.currentId(res.stream);
+      if (used) window.VrCamera.save(used); else if (res.fellBack) window.VrCamera.save('');
+      video.srcObject = res.stream;
       await video.play();
       mode = 'camera';
       simBadge.style.display = 'none';
-      setStatus('Camera live. REAL feed: this is the actual validation path.');
+      await window.VrCamera.fill([camSel], used);
+      setStatus(res.fellBack ? 'Saved camera not found, using the default one. Pick another from the camera list.'
+        : 'Camera live. REAL feed: this is the actual validation path.');
     } catch (err) {
       setStatus('Camera unavailable: ' + err.message +
         ' (needs permission and HTTPS or localhost). Try Simulation meanwhile.');
     }
-  });
+  }
+  btnCamera.addEventListener('click', () => startCamera(window.VrCamera.saved()));
+  camSel.addEventListener('change', () => { window.VrCamera.save(camSel.value); if (mode === 'camera') startCamera(camSel.value); });
+  if (navigator.mediaDevices) {
+    const refreshCams = () => window.VrCamera.fill([camSel], undefined).catch(() => {});
+    refreshCams();
+    if (navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', refreshCams);
+  }
 
   btnSim.addEventListener('click', () => {
     if (video.srcObject) {

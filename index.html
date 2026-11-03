@@ -15,6 +15,7 @@
   #simBadge { position: absolute; top: 10px; left: 10px; background: #b45309; color: #fff;
     padding: 3px 10px; border-radius: 6px; font-weight: 600; font-size: 13px; display: none; }
   .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; align-items: center; }
+  select { background: #2b3040; color: #e8eaf0; border: 1px solid #3c4358; border-radius: 6px; padding: 6px 8px; max-width: 220px; }
   button { background: #2b3040; color: #e8eaf0; border: 1px solid #3c4358; border-radius: 6px;
     padding: 8px 14px; font-size: 14px; cursor: pointer; }
   button:hover { background: #343b4f; }
@@ -41,6 +42,7 @@
     <div id="simBadge">SIMULATED FEED - not your camera</div>
     <div class="controls">
       <button id="btnCamera">Use camera</button>
+      <select id="camSelect" title="Choose camera" aria-label="Choose camera" style="display:none"></select>
       <button id="btnSim">Simulation</button>
       <button id="btnCalA">calibrate A <span class="swatch" id="swACenter"></span><span class="swatch" id="swAPointer"></span></button>
       <button id="btnCalB">calibrate B <span class="swatch" id="swBCenter"></span><span class="swatch" id="swBPointer"></span></button>
@@ -58,6 +60,7 @@
 <video id="cam" playsinline muted style="display:none"></video>
 <script src="src/tracker.js"></script>
 <script src="src/sim.js"></script>
+<script src="src/camera.js"></script>
 <script src="src/app.js"></script>
 </body>
 </html>

@@ -10,12 +10,14 @@
   'use strict';
   const T = root.VrTracker;
   const G = root.VrGame;
+  const C = root.VrCamera;
 
   function create(opts) {
     const video = opts.video;                 // hidden <video>
     const preview = opts.preview;             // small visible preview canvas
     const pctx = preview.getContext('2d');
     const markerEl = opts.markerEl || null;
+    const selects = (opts.selects || []).filter(Boolean);
     const onStatus = opts.onStatus || function () {};
     const cfg = T.defaultConfig();
     // Pick up per-wheel colors calibrated on the tracker page (same device).
@@ -46,22 +48,42 @@
     let diagN = 0;
     const diag = {};
 
-    async function start() {
+    // deviceId: optional camera to open; defaults to the one saved in this browser.
+    async function start(deviceId) {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: false
-        });
+        const want = deviceId !== undefined ? deviceId : C.saved();
+        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+        const res = await C.open(want);
+        stream = res.stream;
+        const used = C.currentId(stream);
+        if (used) C.save(used); else if (res.fellBack) C.save('');
+        resetTracking();
+        if (selects.length) await C.fill(selects, used);
         video.srcObject = stream;
         await video.play();
         preview.style.display = 'block';
         if (markerEl) markerEl.style.display = 'block';
-        onStatus('Camera live. Hold the wheels level, then press RECENTER or start.');
+        onStatus(res.fellBack ? 'Saved camera not found, using the default one. Pick another from the camera list.' : 'Camera live. Hold the wheels level, then press RECENTER or start.');
         return true;
       } catch (err) {
         onStatus('Camera unavailable: ' + err.message +
           ' (needs permission and HTTPS). Keyboard still works.');
         return false;
       }
+    }
+
+    // A new camera means new geometry: drop old wheel history and baselines.
+    function resetTracking() {
+      for (const k of ['A', 'B']) { baselines[k] = null; latest[k] = null; present[k] = false; }
+      const fresh = T.createState();
+      for (const k of Object.keys(state)) delete state[k];
+      Object.assign(state, fresh);
+    }
+
+    async function switchCamera(deviceId) {
+      if (stream) return start(deviceId);
+      C.save(deviceId);
+      return false;
     }
 
     function stop() {
@@ -149,7 +171,7 @@
 
     function wheelSeen(label) { return !!latest[label]; }
 
-    return { start, stop, recenter, active, update, getSteer, wheelSeen, cfg, baselines };
+    return { start, stop, switchCamera, recenter, active, update, getSteer, wheelSeen, cfg, baselines };
   }
 
   root.VrWheelInput = { create };

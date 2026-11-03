@@ -382,14 +382,29 @@ import * as THREE from 'three';
   canvas.addEventListener('pointerup', endTouch);
   canvas.addEventListener('pointercancel', endTouch);
 
+  const camSelects = [document.getElementById('camSelectTop'), document.getElementById('camSelectStart')];
   const wheels = window.VrWheelInput.create({
     video: document.getElementById('cam'),
     preview,
     markerEl: document.getElementById('markers'),
+    selects: camSelects,
     onStatus: setStatus
   });
+  // Camera chooser: same list in the top bar and on the start screen. Picking
+  // one switches the live camera without reloading (or just remembers it).
+  for (const sel of camSelects) {
+    sel.addEventListener('change', async () => {
+      for (const o of camSelects) o.value = sel.value;
+      await wheels.switchCamera(sel.value);
+    });
+  }
+  if (window.VrCamera && navigator.mediaDevices) {
+    const refreshCams = () => window.VrCamera.fill(camSelects, undefined).catch(() => {});
+    refreshCams();
+    if (navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', refreshCams);
+  }
   // Read-only diagnostic handle (used by live checks; handy for tinkering).
-  window.__vracker = { game, version: '2.2.0', wheels };
+  window.__vracker = { game, version: '2.3.0', wheels };
 
   btnCamera.addEventListener('click', async () => { ensureAudio(); await wheels.start(); });
   btnCamera2.addEventListener('click', async () => { ensureAudio(); await wheels.start(); });
