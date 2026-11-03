@@ -593,6 +593,18 @@ import * as THREE from 'three';
     for (const [id, m] of starMeshes) {
       if (!seenStar.has(id)) { scene.remove(m); starMeshes.delete(id); }
     }
+    const seenHeart = new Set();
+    for (const h of game.heartsPickups) {
+      const m = getHeartMesh(h);
+      m.position.set(h.x, h.y, h.z);
+      m.rotation.y = Math.sin(h.spin) * 0.55;        // gentle wobble, keeps the face readable
+      const pulse = 1.15 + Math.sin(h.spin * 2.2) * 0.15;
+      m.scale.set(pulse, pulse, pulse);
+      seenHeart.add(h.id);
+    }
+    for (const [id, m] of heartMeshes) {
+      if (!seenHeart.has(id)) { scene.remove(m); heartMeshes.delete(id); }
+    }
     maxAsteroidsSeen = Math.max(maxAsteroidsSeen, game.asteroids.length);
     syncStripes();
 
