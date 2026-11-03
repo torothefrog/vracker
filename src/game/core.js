@@ -39,6 +39,8 @@
     invulnS: 2.0,        // ship invulnerability after a hit
     starEveryS: 2.6,     // mean time between star spawns
     starR: 0.55,
+    heartEveryS: 24,     // mean time between heart pickups; only while a heart is missing
+    heartR: 0.6,
     starScore: 50,
     dodgeScore: 5,       // per asteroid survived past the ships
     scorePerS: 10,       // survival trickle
@@ -63,9 +65,9 @@
             { label: 'A', x: -2.4, vx: 0, inv: 0, steer: 0 },
             { label: 'B', x: 2.4, vx: 0, inv: 0, steer: 0 }
           ],
-      asteroids: [], stars: [], particles: [],
+      asteroids: [], stars: [], particles: [], heartsPickups: [],
       nextId: 1,
-      spawnTimer: 2.4, starTimer: cfg.starEveryS,
+      spawnTimer: 2.4, starTimer: cfg.starEveryS, heartTimer: cfg.heartEveryS,
       events: []           // consumed by renderer/audio each frame
     };
     return state;
@@ -80,7 +82,9 @@
     for (const s of state.ships) { s.vx = 0; s.inv = 0; s.steer = 0; }
     state.asteroids.length = 0;
     state.stars.length = 0;
+    state.heartsPickups.length = 0;
     state.spawnTimer = 2.4; state.starTimer = state.cfg.starEveryS;
+    state.heartTimer = state.cfg.heartEveryS;
   }
 
   // Wheel angle (continuous degrees) -> normalized steering. The baseline is
@@ -122,6 +126,20 @@
     } else {
       spawnAsteroid(state, (rng() * 2 - 1) * cfg.laneW, y(), r());
     }
+  }
+
+  // Heart pickups show up only here and there, only while the team is
+  // missing a heart, and never more than one on the field at a time.
+  function spawnHeart(state) {
+    const cfg = state.cfg, rng = state.rng;
+    state.heartsPickups.push({
+      id: state.nextId++,
+      x: (rng() * 2 - 1) * cfg.laneW,
+      y: cfg.shipY + (rng() - 0.5) * 2 * cfg.astYVar,
+      z: cfg.spawnZ,
+      vz: state.speed * 0.95,
+      spin: rng() * 6.28
+    });
   }
 
   function spawnStar(state) {
@@ -185,6 +203,11 @@
       spawnStar(state);
       state.starTimer = cfg.starEveryS * (0.7 + state.rng() * 0.6);
     }
+    state.heartTimer -= dt;
+    if (state.heartTimer <= 0) {
+      if (state.hearts < cfg.startHearts && state.heartsPickups.length === 0) spawnHeart(state);
+      state.heartTimer = cfg.heartEveryS * (0.7 + state.rng() * 0.6);
+    }
 
     // Move asteroids, resolve collisions at the ship plane.
     for (const a of state.asteroids) {
@@ -229,6 +252,23 @@
       }
     }
     state.stars = state.stars.filter(s => !s.dead && s.z < cfg.despawnZ);
+
+    // Heart pickups drift by like stars; catching one refills one lost heart,
+    // never above the starting count.
+    for (const h of state.heartsPickups) {
+      h.z += h.vz * dt;
+      h.spin += dt * 2.5;
+      for (const sh of state.ships) {
+        const dx = h.x - sh.x, dy = h.y - cfg.shipY, dz = h.z - cfg.shipZ;
+        if (dx * dx + dy * dy + dz * dz < (cfg.shipR + cfg.heartR) * (cfg.shipR + cfg.heartR)) {
+          h.dead = true;
+          state.hearts = Math.min(cfg.startHearts, state.hearts + 1);
+          state.events.push({ type: 'heart', ship: sh.label, x: h.x, y: h.y, z: h.z });
+          break;
+        }
+      }
+    }
+    state.heartsPickups = state.heartsPickups.filter(h => !h.dead && h.z < cfg.despawnZ);
     return state;
   }
 

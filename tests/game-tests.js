@@ -207,6 +207,54 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
   check('solo: restart keeps one centered ship', g.ships.length === 1 && g.ships[0].x === 0);
 }
 
+// --- heart pickups: rare, only while damaged, refill one lost heart ---
+{
+  const g = G.createGame({ rng: G.seededRng(9), cfg: { starEveryS: 999, heartEveryS: 5 } });
+  G.restart(g);
+  g.spawnTimer = 999; // no asteroid waves in this test
+  for (let i = 0; i < 60 * 30; i++) G.step(g, 1 / 60, 0, 0); // 30s at full hearts
+  check('no heart pickup while at full hearts', g.heartsPickups.length === 0);
+  g.hearts = 3;
+  let maxLive = 0;
+  for (let i = 0; i < 60 * 30; i++) {
+    G.step(g, 1 / 60, 0, 0);
+    maxLive = Math.max(maxLive, g.heartsPickups.length);
+    if (g.events.some(e => e.type === 'heart')) g.hearts = 3; // keep it damaged for the survey
+  }
+  check('heart pickup spawns once a heart is missing', maxLive >= 1);
+  check('never more than one heart pickup at a time', maxLive <= 1, 'max=' + maxLive);
+  // collection restores one heart and reports it
+  g.heartsPickups.length = 0;
+  g.heartsPickups.push({ id: 850, x: g.ships[0].x, y: 0, z: -0.5, vz: g.speed, spin: 0 });
+  const hh0 = g.hearts;
+  G.step(g, 1 / 60, 0, 0);
+  check('heart pickup restores one heart', g.hearts === hh0 + 1, 'hearts=' + g.hearts);
+  check('heart event emitted', g.events.some(e => e.type === 'heart' && e.ship === 'A'));
+  check('heart pickup consumed', !g.heartsPickups.some(h => h.id === 850));
+  // cap: a pickup never raises hearts above the starting count
+  g.hearts = g.cfg.startHearts;
+  g.heartsPickups.push({ id: 851, x: g.ships[0].x, y: 0, z: -0.5, vz: g.speed, spin: 0 });
+  G.step(g, 1 / 60, 0, 0);
+  check('hearts capped at the starting count', g.hearts === g.cfg.startHearts);
+  // a missed pickup drifts past and despawns without effect
+  g.hearts = 3;
+  g.heartsPickups.length = 0;
+  g.heartsPickups.push({ id: 852, x: 99, y: 0, z: -2, vz: g.speed, spin: 0 });
+  for (let i = 0; i < 120; i++) G.step(g, 1 / 60, 0, 0);
+  check('missed heart pickup despawns', !g.heartsPickups.some(h => h.id === 852));
+  check('missed heart pickup changes nothing', g.hearts === 3);
+  G.restart(g);
+  check('restart clears heart pickups', g.heartsPickups.length === 0);
+  // solo mode: the one ship can pick a heart up too
+  const s1 = G.createGame({ rng: G.seededRng(12), players: 1, cfg: { heartEveryS: 999 } });
+  G.restart(s1);
+  s1.hearts = 2;
+  s1.heartsPickups.push({ id: 860, x: s1.ships[0].x, y: 0, z: -0.5, vz: s1.speed, spin: 0 });
+  G.step(s1, 1 / 60, 0);
+  check('solo: heart pickup restores a heart', s1.hearts === 3
+    && s1.events.some(e => e.type === 'heart'), 'hearts=' + s1.hearts);
+}
+
 // --- default stays two-player ---
 {
   const g = G.createGame({ rng: G.seededRng(8) });

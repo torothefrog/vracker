@@ -14,7 +14,8 @@
   .hud { position: fixed; top: 10px; left: 16px; right: auto; display: flex;
     justify-content: flex-start; gap: 28px; align-items: baseline; pointer-events: none;
     text-shadow: 0 2px 6px rgba(0,0,0,0.7); }
-  #hearts { color: #ff6b8a; font-size: 26px; letter-spacing: 3px; }
+  #hearts { color: #ff6b8a; display: flex; gap: 4px; align-items: center;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
   #score { font-size: 24px; font-weight: 700; }
   #best { font-size: 15px; color: #cbb8ff; }
 
@@ -38,7 +39,8 @@
     .topbar { top: auto; bottom: 8px; right: 8px; flex-direction: column; gap: 5px; }
     .topbar button { font-size: 12px; padding: 8px 10px; min-height: 34px; }
     #status { padding: 0 12px; top: 46px; bottom: auto; left: 0; right: 0; font-size: 11px; text-align: center; }
-    #hearts { font-size: 19px; }
+    #hearts svg { width: 16px; height: 16px; }
+    #hearts { gap: 3px; }
     #score { font-size: 18px; }
     #best { font-size: 12px; }
     .hud { gap: 12px; }
@@ -96,7 +98,7 @@
 <div class="overlay" id="startOverlay">
   <h1>SPACE DODGERS</h1>
   <p>One screen, endless asteroids. Dodge the rocks, catch the stars,
-    and keep your five hearts as long as you can.</p>
+    and grab a heart pickup to win back a heart you lost.</p>
   <p><b>1 PLAYER</b> - one ship: any wheel, A/D or arrow keys, or drag anywhere.<br>
      <b>2 PLAYERS</b> - <b style="color:#35d07f">Ship A</b> turns with the green wheel (or A/D keys, or drag
      the left half), <b style="color:#41b8f5">Ship B</b> with the blue wheel (or arrow keys, or the right half).</p>
@@ -123,9 +125,9 @@
 
 <script src="src/tracker.js?v=2"></script>
 <script src="src/camera.js?v=1"></script>
-<script src="src/game/core.js?v=5"></script>
+<script src="src/game/core.js?v=6"></script>
 <script src="src/game/wheelinput.js?v=5"></script>
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
-<script type="module" src="src/game/game3d.js?v=10"></script>
+<script type="module" src="src/game/game3d.js?v=11"></script>
 </body>
 </html>

@@ -72,6 +72,7 @@ import * as THREE from 'three';
   }
   const sfx = {
     collect() { tone(880, 1568, 0.16, 'sine', 0.10); tone(1320, 2093, 0.12, 'triangle', 0.05); },
+    heart() { tone(660, 990, 0.14, 'sine', 0.10); setTimeout(() => tone(990, 1320, 0.2, 'sine', 0.10), 120); },
     hit() { noiseBurst(0.3, 0.22); tone(160, 60, 0.28, 'sawtooth', 0.08); },
     start() { tone(523, 523, 0.1, 'triangle', 0.1); setTimeout(() => tone(659, 659, 0.1, 'triangle', 0.1), 110); setTimeout(() => tone(784, 1046, 0.18, 'triangle', 0.12), 220); },
     over() { tone(392, 196, 0.5, 'triangle', 0.12); setTimeout(() => tone(330, 165, 0.6, 'triangle', 0.1), 250); }
@@ -301,6 +302,30 @@ import * as THREE from 'three';
     return m;
   }
 
+  // Heart pickups: an original flat heart shape (drawn in code, no assets),
+  // extruded thin so it reads as a clean icon against the sky.
+  const heartMeshes = new Map();
+  const heartShape = new THREE.Shape();
+  heartShape.moveTo(0, 0.28);
+  heartShape.bezierCurveTo(-0.08, 0.52, -0.38, 0.56, -0.5, 0.34);
+  heartShape.bezierCurveTo(-0.68, 0.02, -0.42, -0.3, 0, -0.52);
+  heartShape.bezierCurveTo(0.42, -0.3, 0.68, 0.02, 0.5, 0.34);
+  heartShape.bezierCurveTo(0.38, 0.56, 0.08, 0.52, 0, 0.28);
+  const heartGeoMesh = new THREE.ExtrudeGeometry(heartShape, { depth: 0.2, bevelEnabled: false });
+  heartGeoMesh.center();
+  const heartMatPink = new THREE.MeshStandardMaterial({
+    color: 0xff5c8a, emissive: 0x7a1030, flatShading: true, roughness: 0.35
+  });
+  function getHeartMesh(h) {
+    let m = heartMeshes.get(h.id);
+    if (!m) {
+      m = new THREE.Mesh(heartGeoMesh, heartMatPink);
+      heartMeshes.set(h.id, m);
+      scene.add(m);
+    }
+    return m;
+  }
+
   // Particle bursts (pooled tiny tetra shards).
   const particles = [];
   const shardGeo = new THREE.TetrahedronGeometry(0.16);
@@ -404,7 +429,7 @@ import * as THREE from 'three';
     if (navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', refreshCams);
   }
   // Read-only diagnostic handle (used by live checks; handy for tinkering).
-  window.__vracker = { game, version: '2.3.0', wheels };
+  window.__vracker = { game, version: '2.4.0', wheels };
 
   btnCamera.addEventListener('click', async () => { ensureAudio(); await wheels.start(); });
   btnCamera2.addEventListener('click', async () => { ensureAudio(); await wheels.start(); });
@@ -466,9 +491,25 @@ import * as THREE from 'three';
   setMode(players, false);
 
   // ---------- HUD ----------
+  // Flat inline-SVG hearts (recolorable icons, no emoji): filled for hearts
+  // you have, dim outline-fill for hearts lost.
+  const HEART_PATH = 'M12 21 C12 21 2 13.6 2 7.6 C2 4.5 4.4 2.2 7.3 2.2 ' +
+    'C9.2 2.2 11 3.3 12 4.9 C13 3.3 14.8 2.2 16.7 2.2 C19.6 2.2 22 4.5 22 7.6 ' +
+    'C22 13.6 12 21 12 21 Z';
+  function heartIcon(fill, stroke) {
+    return '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">' +
+      '<path d="' + HEART_PATH + '" fill="' + fill + '" stroke="' + stroke +
+      '" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+  }
   function drawHearts() {
     const full = Math.max(0, game.hearts);
-    hudHearts.textContent = '♥'.repeat(full) + '♡'.repeat(game.cfg.startHearts - full);
+    let html = '';
+    for (let i = 0; i < game.cfg.startHearts; i++) {
+      html += i < full
+        ? heartIcon('#ff6b8a', 'rgba(0,0,0,0.35)')
+        : heartIcon('rgba(255,107,138,0.12)', 'rgba(255,107,138,0.55)');
+    }
+    hudHearts.innerHTML = html;
   }
   drawHearts();
 
@@ -476,6 +517,11 @@ import * as THREE from 'three';
   const clock = new THREE.Clock();
   let testTime = 0, testHits = 0, testCollects = 0, testDone = false;
   let maxAsteroidsSeen = 0;
+  // ?heartdemo=1 freezes a frame with a pickup mid-flight and a damaged HUD;
+  // ?heartdemo=2 forces a pickup onto the ship at the end so the restored
+  // heart (HUD + burst) is visible in the frozen frame. Test-only hooks.
+  const HEART_DEMO = Number(params.get('heartdemo') || 0);
+  let heartDemoDone = false;
 
 
   // ---------- Lane guide: edge rails + asteroid path stripes ----------
@@ -573,6 +619,10 @@ import * as THREE from 'three';
       } else if (ev.type === 'collect') {
         burst(ev.x, ev.y, ev.z, 0xffd94d, 12, 4);
         sfx.collect();
+      } else if (ev.type === 'heart') {
+        burst(ev.x, ev.y, ev.z, 0xff6b9d, 18, 5);
+        burst(ev.x, ev.y, ev.z, 0xffc2d4, 10, 3);
+        sfx.heart();
       } else if (ev.type === 'gameover') {
         sfx.over();
         const sc = Math.floor(game.score);
@@ -595,7 +645,23 @@ import * as THREE from 'three';
       // then freeze and keep rendering the reached state for screenshots.
       if (!game.started) startGame();
       if (!testDone) {
+        if (HEART_DEMO) {
+          game.hearts = Math.max(1, game.cfg.startHearts - 2);
+          drawHearts();
+        }
         while (testTime < TEST_SECONDS && !game.gameOver) {
+          if (HEART_DEMO && !heartDemoDone && testTime >= TEST_SECONDS - (HEART_DEMO === 1 ? 1.8 : 0.4)) {
+            heartDemoDone = true;
+            if (HEART_DEMO === 1) {
+              // park a pickup ahead of ship A, out of collection range
+              game.heartsPickups.push({ id: 90001, x: game.ships[0].x, y: 0, z: -30, vz: game.speed * 0.95, spin: 0 });
+            } else {
+              // drop one right on the ship: collected within a frame or two
+              game.asteroids.length = 0;
+              game.spawnTimer = 999;
+              game.heartsPickups.push({ id: 90002, x: game.ships[0].x, y: 0, z: game.cfg.shipZ - 0.5, vz: game.speed * 0.95, spin: 0 });
+            }
+          }
           testTime += 1 / 60;
           const sa = Math.sin(testTime * 0.9), sb = Math.cos(testTime * 0.7) * 0.8;
           G.step(game, 1 / 60, sa, game.ships.length > 1 ? sb : 0);
